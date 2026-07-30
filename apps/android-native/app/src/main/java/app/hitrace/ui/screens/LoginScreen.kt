@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hitrace.AppViewModel
+import app.hitrace.BuildConfig
 import app.hitrace.data.Shape
 import app.hitrace.ui.BladeCanvas
 import app.hitrace.ui.theme.Rb
@@ -56,7 +57,7 @@ fun LoginScreen(vm: AppViewModel) {
             glow = true,
             modifier = Modifier.size(heroHeight * 0.47f, heroHeight),
         )
-        Text("RUN → BLADE", color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 3.sp)
+        Text("HIT → RACE", color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 3.sp)
         Text(
             "달린 경로가\n검이 된다",
             color = Rb.Text, fontSize = 30.sp, fontWeight = FontWeight.Bold,
@@ -95,6 +96,21 @@ fun LoginScreen(vm: AppViewModel) {
         if (error != null) {
             Text(error!!, color = Rb.Red, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
         }
-        Text("네이티브 · Kotlin + Jetpack Compose", color = Rb.Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 14.dp))
+        // Which build am I looking at, and which backend is it talking to? Without this a
+        // screenshot of a stale APK is indistinguishable from a current one.
+        Text(
+            "v${BuildConfig.VERSION_NAME} · ${backendLabel()}",
+            color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+            modifier = Modifier.padding(top = 14.dp),
+        )
+    }
+}
+
+/** "supabase" for the cloud backend, otherwise the host we're pointed at (local dev server). */
+private fun backendLabel(): String {
+    val base = BuildConfig.API_BASE
+    return when {
+        base.contains("supabase.co") -> "supabase"
+        else -> base.removePrefix("http://").removePrefix("https://").substringBefore('/')
     }
 }
