@@ -4,7 +4,7 @@
 선택지 · 내 추천을 적어 두었습니다. 답을 주시면 바로 반영합니다.
 (자율 판단으로 처리한 것들은 `docs/DECISIONS.md`와 `apps/android-native/NATIVE_ROADMAP.md`에 기록)
 
-최종 수정: 2026-07-29 · 대상: 네이티브(Kotlin/Compose) 클라이언트 + 기존 Fastify/Postgres 백엔드
+최종 수정: 2026-07-30 · 대상: HitRace 네이티브(Kotlin/Compose) 클라이언트 + Supabase 백엔드
 
 ---
 
@@ -86,13 +86,10 @@
 - **선택지:** (a) 한국어만, (b) 영어 추가(strings.xml 추출 + 번역).
 - **추천:** 국내 출시가 목표면 (a) 유지. 해외도 생각 중이면 지금 문자열을 빼두는 편이 쌉니다.
 
-## 9. Postgres 연결 (기존 이슈, 그대로 유효)
+## 9. Postgres 연결 - ✅ 해결됨: Supabase Postgres
 
-- **현재:** API는 `DATABASE_URL`이 없으면 **인메모리**로 동작합니다. 서버를 껐다 켜면 데이터가
-  초기화됩니다(지금 테스트 계정도 그렇습니다). 로컬 PostgreSQL 17은 설치돼 있으나
-  비밀번호를 몰라 연결하지 못했습니다.
-- **필요:** 사용자가 `DATABASE_URL`을 알려주거나, 새 DB를 만들 권한.
-- **추천:** 배포 서버(1번)와 함께 관리형 Postgres를 쓰는 편이 깔끔합니다.
+- 운영 데이터는 Supabase Postgres에 있습니다(스키마 `hitrace`). 로컬 Fastify 개발 서버는 여전히
+  인메모리로 돌아 테스트가 빠릅니다 - 이건 의도된 구성입니다.
 
 ---
 

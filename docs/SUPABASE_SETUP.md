@@ -1,8 +1,27 @@
 # Supabase 백엔드 설정
 
-별도 API 서버를 띄우지 않고 **Supabase Postgres + Auth + Edge Function** 으로 운영하는 구성입니다.
-아래 명령만 순서대로 실행하면 됩니다. 저는 자격 증명이 없어서 배포까지는 못 했고,
-**코드·마이그레이션·함수·앱 배선은 전부 준비**해 두었습니다.
+별도 API 서버 없이 **Supabase Postgres + Auth + Edge Function** 으로 운영합니다.
+
+## 현재 상태: 배포 완료 (2026-07-30)
+
+- 프로젝트: `hfxtzevtnldsmbgcnwoa` (ap-northeast-2 / Seoul)
+- 스키마 `hitrace` 20개 테이블 + RLS 정책 20개 + 가입/삭제 트리거 2개 적용
+- 시드: PvP 봇 3 + 각인 5 + 시즌 3 + 스토어 4 + 밸런스 미러
+- Edge Function `game` 배포됨 → `https://hfxtzevtnldsmbgcnwoa.supabase.co/functions/v1/game`
+- 익명 로그인 활성화(`external_anonymous_users_enabled=true`)
+- 검증: health · 익명 로그인 · `/me` · `/pvp/ranking` · 주조(쓰기) 모두 통과, **앱에서도 계정 생성
+  → 데모 러닝 → 주조까지 성공**(검이 Supabase에 저장됨)
+
+앱 빌드용 키는 저장소가 아니라 `%USERPROFILE%\.gradle\gradle.properties` 에 있습니다:
+```
+SUPABASE_URL=https://hfxtzevtnldsmbgcnwoa.supabase.co
+SUPABASE_ANON_KEY=<anon key>
+```
+없으면 앱은 로컬 개발 서버(`10.0.2.2:8787`)로 폴백합니다.
+
+---
+
+아래는 처음부터 다시 세팅하거나 다른 프로젝트에 올릴 때의 절차입니다.
 
 ## 왜 Edge Function이 필요한가 (중요)
 

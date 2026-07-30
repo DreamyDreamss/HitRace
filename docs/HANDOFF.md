@@ -15,6 +15,13 @@
 
 테스트: **엔진 62 · API 26 · 네이티브 9(밸런스 패리티) · 웹 E2E 2** — 전부 통과.
 
+## 0. 저장소 / 백엔드
+
+- GitHub: https://github.com/DreamyDreamss/HitRace (`main`)
+- 백엔드: Supabase 프로젝트 `hfxtzevtnldsmbgcnwoa` (Seoul) - 스키마·RLS·시드·Edge Function 배포 완료.
+  앱은 익명 로그인으로 시작하고, 모든 쓰기는 `game` Edge Function을 지납니다.
+- 앱 빌드용 Supabase 키는 저장소에 없습니다 - `%USERPROFILE%\.gradle\gradle.properties` 에 있습니다.
+
 ## 1. 지금 바로 돌려보기
 
 ```bash
@@ -37,7 +44,7 @@ pnpm -r test                                   # 엔진 + API
 cd apps/android-native && ./gradlew.bat :app:testDebugUnitTest
 ```
 
-## 2. Postgres 연결 (선택)
+## 2. 로컬 전용 Postgres (선택 - 운영은 Supabase)
 
 API는 `DATABASE_URL`이 없으면 **인메모리**로 돌고, 서버를 끄면 데이터가 사라집니다. 로컬에 PostgreSQL 17이
 있지만 비밀번호를 몰라 연결하지 못했습니다.
