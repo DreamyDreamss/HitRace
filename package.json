@@ -1,0 +1,20 @@
+{
+  "name": "hitrace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "러닝 RPG — the route you run becomes a blade.",
+  "packageManager": "pnpm@9.6.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "dev": "pnpm --parallel --filter ./apps/* dev",
+    "typecheck": "pnpm -r typecheck",
+    "db:setup": "psql \"$DATABASE_URL\" -f db/schema.sql && psql \"$DATABASE_URL\" -f db/seed.sql",
+    "supabase:build": "pnpm --filter @hitrace/game-core build && pnpm --filter @hitrace/api build",
+    "supabase:deploy": "pnpm supabase:build && npx supabase functions deploy game",
+    "supabase:push": "npx supabase db push"
+  }
+}

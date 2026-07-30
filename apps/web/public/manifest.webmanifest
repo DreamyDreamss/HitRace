@@ -1,0 +1,13 @@
+{
+  "name": "러닝 RPG · RunBlade",
+  "short_name": "RunBlade",
+  "description": "달린 경로가 검이 된다 — the route you run becomes a blade.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08090B",
+  "theme_color": "#08090B",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

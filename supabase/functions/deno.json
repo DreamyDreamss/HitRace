@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "pg": "npm:pg@^8.12.0",
+    "@hitrace/game-core": "../../packages/game-core/dist/index.js",
+    "@hitrace/api/service": "../../apps/api/dist/service.js",
+    "@hitrace/api/repo-pg": "../../apps/api/dist/db/pg.js"
+  }
+}

@@ -1,0 +1,35 @@
+# Supabase project config for HitRace.
+#   npx supabase link --project-ref <ref>
+#   npx supabase db push
+#   npx supabase functions deploy game
+
+project_id = "hitrace"
+
+[api]
+enabled = true
+port = 54321
+# The game lives in its own schema; expose it so clients can do cheap own-row reads
+# (RLS-protected, read-only — every write goes through the `game` function).
+schemas = ["public", "hitrace"]
+extra_search_path = ["public", "hitrace", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[auth]
+enabled = true
+site_url = "hitrace://auth"
+# Anonymous sign-in backs the "러너 이름만 넣고 시작" flow; a real provider can be
+# linked to the same auth user later without losing game state.
+enable_anonymous_sign_ins = true
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[functions.game]
+# The gateway verifies the Supabase JWT before our code runs; the handler then trusts `sub`.
+verify_jwt = true

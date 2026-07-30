@@ -1,0 +1,40 @@
+# deps / build output
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+.output/
+*.tsbuildinfo
+
+# Android
+.gradle/
+local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+captures/
+.cxx/
+
+# Supabase local state
+supabase/.temp/
+supabase/.branches/
+
+# secrets — Supabase URL/keys live in %USERPROFILE%\.gradle\gradle.properties
+.env
+.env.local
+.env.*
+!.env.example
+
+# editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# logs & test artifacts
+*.log
+npm-debug.log*
+playwright-report/
+test-results/
