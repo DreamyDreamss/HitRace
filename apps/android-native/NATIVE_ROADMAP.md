@@ -72,6 +72,18 @@ consistency check between `data/Balance.kt` and `packages/game-core`.
   `LinkText` — 48dp target, announced as a button — and bottom-nav items carry `Role.Tab` +
   selected state.
 
+## GPS 이상치 처리 (2026-07-31)
+폰에서 러닝 2건이 연속으로 `gps_jump` 거절 → 컬렉션이 빈 채로 남았습니다. 안티치트가 **단 한 개의
+튄 좌표만으로 러닝 전체를 버리고** 있었는데, 콜드 픽스·터널·건물 반사는 실제로 흔합니다.
+- `sanitizeTrack` — 마지막 *채택된* 점 기준으로 속도를 재고 불가능한 샘플을 버립니다. dt가 누적되므로
+  수신이 잠깐 끊긴 사이 실제로 이동한 거리는 벌점이 없습니다.
+- 부정은 그대로 걸립니다: 조작된 경로는 이후 모든 점이 계속 탈락하므로 **연속 3개 이상 탈락**
+  또는 **전체의 15% 초과 탈락**이면 `gps_jump`로 거절. 라이브 검증: 1샘플 스파이크 → 200(5.99km,
+  뻥튀기된 11km는 제거됨), 지속 텔레포트 → 422 `gps_jump`.
+- 서비스는 **원본**을 검증하고(이상치를 봐야 판단이 되므로) 정제된 트랙을 저장·채점합니다.
+  코스 지문만 정제본으로 계산해 나쁜 픽스 하나가 익숙한 코스를 새 코스로 만들지 않게 했습니다.
+- 앱은 이제 422 본문을 읽어 이유별 안내를 띄웁니다(이전엔 전부 "주조 조건 미충족").
+
 ## Fixed along the way
 - Workshop → 부위 지정 → back lost the in-progress transform (Navigation-Compose disposes the
   screen), so "이대로 주조" saved an empty one → `CraftSession` holds it across the hop.

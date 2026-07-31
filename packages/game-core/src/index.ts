@@ -5,7 +5,7 @@ export { BALANCE } from './config/balance.js';
 export type { Balance } from './config/balance.js';
 export { Rng } from './rng.js';
 export * from './geo.js';
-export { validateRun } from './anticheat.js';
+export { validateRun, sanitizeTrack } from './anticheat.js';
 export type { ValidateOptions } from './anticheat.js';
 export {
   deriveMetrics,

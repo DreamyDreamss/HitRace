@@ -37,6 +37,7 @@ import app.hitrace.data.ApiClient
 import app.hitrace.data.RunBody
 import app.hitrace.data.RunMath
 import app.hitrace.data.RunSession
+import app.hitrace.data.apiFailure
 import app.hitrace.ui.RouteTrace
 import app.hitrace.ui.theme.Rb
 import kotlinx.coroutines.launch
@@ -67,10 +68,11 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
                     RunSession.weeklyGoal = res.weeklyGoal
                     if (forge && res.sword != null) { RunSession.forged = res.sword; onForged() } else onSavedOnly()
                 }
-                .onFailure {
+                .onFailure { t ->
+                    val f = t.apiFailure()
                     err = when {
-                        it.message?.contains("429") == true -> "오늘 주조 한도(2자루)를 모두 사용했어요."
-                        it.message?.contains("422") == true -> "주조 조건 미충족 (최소 1km·10분)."
+                        f?.status == 429 -> "오늘 주조 한도(2자루)를 모두 사용했어요."
+                        f?.status == 422 -> rejectionMessage(f.reasons)
                         else -> "문제가 발생했습니다. 다시 시도해 주세요."
                     }
                     busy = false
@@ -153,6 +155,22 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
         }
         Spacer(Modifier.height(8.dp))
     }
+}
+
+/** Say what actually went wrong, and what to do about it — "조건 미충족" tells nobody anything. */
+private fun rejectionMessage(reasons: List<String>): String = when {
+    reasons.isEmpty() -> "이 러닝은 저장할 수 없습니다."
+    "gps_jump" in reasons ->
+        "GPS 신호가 크게 튀어 경로를 신뢰할 수 없습니다. 실내·터널·건물 사이에서 자주 발생해요 — " +
+            "하늘이 트인 곳에서 다시 시도하거나, 실내 러닝으로 기록해 주세요."
+    "vehicle_suspected" in reasons -> "이동 속도가 달리기 범위를 벗어났습니다 (탈것으로 판정)."
+    "pace_too_fast" in reasons -> "평균 페이스가 3'00\"/km보다 빨라 기록으로 인정되지 않습니다."
+    "below_min_distance" in reasons && "below_min_duration" in reasons -> "최소 1km·10분을 채워야 합니다."
+    "below_min_distance" in reasons -> "최소 1km를 달려야 합니다."
+    "below_min_duration" in reasons -> "최소 10분을 달려야 합니다."
+    "too_few_points" in reasons -> "위치 기록이 부족합니다. 위치 권한을 확인해 주세요."
+    "non_monotonic_time" in reasons -> "기록 시간이 뒤엉켰습니다. 다시 시도해 주세요."
+    else -> "이 러닝은 저장할 수 없습니다. (${reasons.joinToString(", ")})"
 }
 
 @Composable

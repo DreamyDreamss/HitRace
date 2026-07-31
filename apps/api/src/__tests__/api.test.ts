@@ -87,6 +87,24 @@ describe('runs → forge', () => {
     expect(res.statusCode).toBe(422);
   });
 
+  it('survives a one-sample GPS spike instead of rejecting the run', async () => {
+    // A single bad fix is what a phone does in a tunnel, not what a cheater does.
+    const track = synthRun(6, 330);
+    track.points[20]!.lat += 0.05; // ~5.5km away for one sample, then back
+    const res = await app.inject({ method: 'POST', url: '/runs', headers: H(), payload: { track, forge: false } });
+    expect(res.statusCode).toBe(200);
+    // The outlier must not survive into the stored distance either.
+    expect(JSON.parse(res.body).run.distanceKm).toBeLessThan(7);
+  });
+
+  it('still rejects a fabricated route as a GPS jump', async () => {
+    const track = synthRun(6, 330);
+    for (let i = 80; i < track.points.length; i++) track.points[i]!.lat += 0.05;
+    const res = await app.inject({ method: 'POST', url: '/runs', headers: H(), payload: { track, forge: true } });
+    expect(res.statusCode).toBe(422);
+    expect(JSON.parse(res.body).error).toContain('gps_jump');
+  });
+
   it('forges a sword from a valid run and grants ore + ticket', async () => {
     const walletBefore = JSON.parse((await app.inject({ method: 'GET', url: '/wallet', headers: H() })).body);
     const res = await app.inject({ method: 'POST', url: '/runs', headers: H(), payload: { track: synthRun(8, 300, 'out_and_back'), forge: true } });

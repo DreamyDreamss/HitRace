@@ -92,6 +92,27 @@ object Auth {
     @Volatile var token: String? = null
 }
 
+/**
+ * The server explains *why* it said no (`{"error":"run_rejected:gps_jump"}`), but Retrofit's
+ * exception message is only "HTTP 422". Without reading the body every rejection looks the same
+ * to the player, which is how a GPS problem ends up looking like a broken button.
+ */
+data class ApiFailure(val status: Int, val code: String) {
+    /** `run_rejected:gps_jump,vehicle_suspected` → ["gps_jump", "vehicle_suspected"] */
+    val reasons: List<String>
+        get() = code.substringAfter("run_rejected:", "").split(',').filter { it.isNotBlank() }
+}
+
+fun Throwable.apiFailure(): ApiFailure? {
+    val e = this as? retrofit2.HttpException ?: return null
+    val body = runCatching { e.response()?.errorBody()?.string() }.getOrNull()
+    val code = body
+        ?.let { runCatching { ApiClient.json.parseToJsonElement(it) }.getOrNull() }
+        ?.let { (it as? kotlinx.serialization.json.JsonObject)?.get("error") }
+        ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+    return ApiFailure(e.code(), code ?: "")
+}
+
 object ApiClient {
     // encodeDefaults so a body like the workshop transform round-trips every field
     // (without it, `rotate = 0` etc. are dropped and the server stores `{}`).

@@ -178,4 +178,6 @@ export interface RunValidation {
   reasons: string[];
   /** Repeat index of this course for the runner (0 = first time). */
   repeatIndex: number;
+  /** The track with GPS outliers removed — what everything downstream should score and store. */
+  track: RunTrack;
 }

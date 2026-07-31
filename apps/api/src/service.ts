@@ -29,6 +29,7 @@ import {
   upgradeCost,
   upgradeSuccessChance,
   validateRun,
+  sanitizeTrack,
   type Combatant,
   type Currency,
   type GachaPull,
@@ -97,9 +98,14 @@ export class GameService {
     const user = await this.repo.getUser(userId);
     if (!user) throw new ServiceError('no_user', 404);
 
-    const courseHash = fingerprint(track);
+    // The fingerprint is taken on the cleaned track so one bad fix can't move a familiar course
+    // to a new one. Validation gets the **raw** track — it has to see the outliers to judge
+    // whether they are sensor noise or a fabricated route — and hands back the cleaned version
+    // that everything downstream scores and stores.
+    const courseHash = fingerprint(sanitizeTrack(track).track);
     const priorRepeats = await this.repo.countRunsForCourse(userId, courseHash);
     const validation = validateRun(track, { priorRepeats });
+    const clean = validation.track;
 
     const now = Date.now();
     const runId = id('run');
@@ -108,7 +114,7 @@ export class GameService {
       const rec: RunRecord = {
         id: runId, userId, status: 'rejected', courseHash, repeatIndex: priorRepeats,
         distanceKm: 0, durationSec: 0, avgPaceSecPerKm: 0, elevationGainM: 0,
-        rejectReasons: validation.reasons, startedAt: track.points[0]?.t ?? now, createdAt: now,
+        rejectReasons: validation.reasons, startedAt: clean.points[0]?.t ?? now, createdAt: now,
       };
       await this.repo.createRun(rec);
       throw new ServiceError('run_rejected:' + validation.reasons.join(','), 422);
@@ -123,7 +129,7 @@ export class GameService {
     }
 
     const swordId = id('sword');
-    const outcome = forgeSword(track, {
+    const outcome = forgeSword(clean, {
       ownerId: userId, runId, swordId, repeatIndex: priorRepeats, createdAt: now, name: opts.name,
     });
     const { sword, metrics } = outcome;
@@ -132,10 +138,10 @@ export class GameService {
       id: runId, userId, status: opts.forge ? 'forged' : 'recorded', courseHash, repeatIndex: priorRepeats,
       distanceKm: metrics.distanceKm, durationSec: Math.round(metrics.durationSec), avgPaceSecPerKm: Math.round(metrics.avgPaceSecPerKm),
       elevationGainM: Math.round(metrics.elevationGainM), forgeScore: undefined,
-      startedAt: track.points[0]!.t, createdAt: now,
+      startedAt: clean.points[0]!.t, createdAt: now,
       // Keep a downsampled polyline: enough to draw the route and compute splits,
       // small enough that a year of running stays cheap to store.
-      route: decimate(track.points, 300),
+      route: decimate(clean.points, 300),
       swordId: opts.forge ? swordId : undefined,
     };
     // Compare against history *before* the row lands, then store.

@@ -22,10 +22,27 @@ describe('anti-cheat validateRun', () => {
     expect(v.ok).toBe(false);
     expect(v.reasons).toContain('pace_too_fast');
   });
-  it('flags a GPS teleport', () => {
-    const v = validateRun(synthRun({ distanceKm: 5, teleportAt: 0.5 }));
+  it('drops an isolated GPS outlier instead of failing the run', () => {
+    // One bad fix is a phone, not a cheater: the run survives, minus the bad point.
+    const raw = synthRun({ distanceKm: 5, teleportAt: 0.5 });
+    const v = validateRun(raw);
+    expect(v.ok).toBe(true);
+    expect(v.track.points.length).toBeLessThan(raw.points.length);
+    expect(v.track.points.length).toBeGreaterThanOrEqual(raw.points.length - 2);
+  });
+  it('rejects a sustained teleport as a GPS jump', () => {
+    const track = synthRun({ distanceKm: 5 });
+    // Everything past the midpoint happens 5km away — no receiver does that.
+    const half = Math.floor(track.points.length / 2);
+    for (let i = half; i < track.points.length; i++) track.points[i]!.lat += 0.045;
+    const v = validateRun(track);
     expect(v.ok).toBe(false);
     expect(v.reasons).toContain('gps_jump');
+  });
+  it('keeps cadence and heart-rate samples aligned after dropping a point', () => {
+    const v = validateRun(synthRun({ distanceKm: 5, teleportAt: 0.5 }));
+    expect(v.track.cadence).toHaveLength(v.track.points.length);
+    expect(v.track.heartRate).toHaveLength(v.track.points.length);
   });
   it('carries the repeat index through', () => {
     expect(validateRun(synthRun(), { priorRepeats: 2 }).repeatIndex).toBe(2);
