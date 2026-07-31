@@ -31,6 +31,7 @@ import app.hitrace.data.ApiClient
 import app.hitrace.data.RunMath
 import app.hitrace.data.Split
 import app.hitrace.ui.BladeCanvas
+import app.hitrace.ui.ElevationChart
 import app.hitrace.ui.RouteTrace
 import app.hitrace.ui.rememberLoad
 import app.hitrace.ui.theme.Rb
@@ -129,6 +130,30 @@ fun RunDetailScreen(runId: String, onBack: () -> Unit, onSword: (String) -> Unit
                             "코스 최고 ${RunMath.paceLabel(it.toDouble())} /km",
                             color = Rb.Text3, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
                         )
+                    }
+                }
+            }
+        }
+
+        // Elevation profile — only when the run actually had some climb worth showing.
+        if (run.elevationGainM >= 5 && data.route.count { it.ele != null } >= 3) {
+            Eyebrow("고도")
+            RbCard {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ElevationChart(data.route, Modifier.fillMaxWidth().height(90.dp))
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(
+                            "총 상승 ${run.elevationGainM}m",
+                            color = Rb.Text3, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        val eles = data.route.mapNotNull { it.ele }
+                        if (eles.isNotEmpty()) {
+                            Text(
+                                "최저 ${eles.min().toInt()}m · 최고 ${eles.max().toInt()}m",
+                                color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                            )
+                        }
                     }
                 }
             }
