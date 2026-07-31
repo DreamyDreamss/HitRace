@@ -62,6 +62,15 @@ interface HitRaceApi {
     @GET("season")
     suspend fun season(): SeasonResp
 
+    @GET("runs")
+    suspend fun runs(@Query("limit") limit: Int = 50): List<RunSummary>
+
+    @GET("runs/{id}")
+    suspend fun runDetail(@Path("id") id: String): RunDetailResp
+
+    @GET("stats/running")
+    suspend fun runningStats(): RunningStats
+
     @GET("codex")
     suspend fun codex(): CodexResp
 

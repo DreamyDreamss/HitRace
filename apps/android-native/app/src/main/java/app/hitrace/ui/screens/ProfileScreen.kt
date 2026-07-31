@@ -30,7 +30,13 @@ import app.hitrace.ui.rememberLoad
 import app.hitrace.ui.theme.Rb
 
 @Composable
-fun ProfileScreen(vm: AppViewModel, onCodex: () -> Unit = {}, onSeason: () -> Unit = {}) {
+fun ProfileScreen(
+    vm: AppViewModel,
+    onCodex: () -> Unit = {},
+    onSeason: () -> Unit = {},
+    onHistory: () -> Unit = {},
+    onStats: () -> Unit = {},
+) {
     val profile = rememberLoad { ApiClient.api.profile() }
     Column(Modifier.fillMaxSize().background(Rb.Bg).verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -57,6 +63,12 @@ fun ProfileScreen(vm: AppViewModel, onCodex: () -> Unit = {}, onSeason: () -> Un
                     }
                 }
             }
+        }
+
+        Text("RUNNING", color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp, letterSpacing = 2.sp, modifier = Modifier.padding(top = 6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            RbGhostButton("러닝 기록", Modifier.weight(1f), tone = Rb.Gold, onClick = onHistory)
+            RbGhostButton("러닝 통계", Modifier.weight(1f), onClick = onStats)
         }
 
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

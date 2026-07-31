@@ -52,6 +52,9 @@ import app.hitrace.ui.screens.GachaScreen
 import app.hitrace.ui.screens.HomeScreen
 import app.hitrace.ui.screens.ManualRunScreen
 import app.hitrace.ui.screens.ProfileScreen
+import app.hitrace.ui.screens.RunDetailScreen
+import app.hitrace.ui.screens.RunHistoryScreen
+import app.hitrace.ui.screens.RunningStatsScreen
 import app.hitrace.ui.screens.RankingScreen
 import app.hitrace.ui.screens.RunningScreen
 import app.hitrace.ui.screens.SummaryScreen
@@ -72,6 +75,10 @@ object Routes {
     const val BATTLE = "pvp/battle"
     const val MANUAL = "run/manual"
     const val CODEX = "codex"
+    const val RUN_HISTORY = "runs"
+    const val RUN_DETAIL = "runs/{id}"
+    const val RUN_STATS = "stats/running"
+    fun runDetail(id: String) = "runs/$id"
     const val COURSE = "course/{hash}"
     // Course hashes can contain ':' (treadmill:5) — encode for the route path.
     fun course(hash: String) = "course/" + android.net.Uri.encode(hash)
@@ -108,7 +115,12 @@ fun MainScaffold(vm: AppViewModel, me: MeResp) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             NavHost(nav, startDestination = Routes.HOME) {
                 composable(Routes.HOME) {
-                    HomeScreen(vm, me, onStartRun = { nav.navigate(Routes.RUN) }, onGacha = { nav.navigate(Routes.GACHA) })
+                    HomeScreen(
+                        vm, me,
+                        onStartRun = { nav.navigate(Routes.RUN) },
+                        onGacha = { nav.navigate(Routes.GACHA) },
+                        onStats = { nav.navigate(Routes.RUN_STATS) },
+                    )
                 }
                 composable(Routes.COLLECTION) {
                     CollectionScreen(
@@ -120,8 +132,29 @@ fun MainScaffold(vm: AppViewModel, me: MeResp) {
                 }
                 composable(Routes.RANKING) { RankingScreen(vm, me) }
                 composable(Routes.PROFILE) {
-                    ProfileScreen(vm, onCodex = { nav.navigate(Routes.CODEX) }, onSeason = { nav.navigate(Routes.SEASON) })
+                    ProfileScreen(
+                        vm,
+                        onCodex = { nav.navigate(Routes.CODEX) },
+                        onSeason = { nav.navigate(Routes.SEASON) },
+                        onHistory = { nav.navigate(Routes.RUN_HISTORY) },
+                        onStats = { nav.navigate(Routes.RUN_STATS) },
+                    )
                 }
+                composable(Routes.RUN_HISTORY) {
+                    RunHistoryScreen(
+                        onBack = { nav.popBackStack() },
+                        onOpen = { nav.navigate(Routes.runDetail(it)) },
+                        onStartRun = { nav.navigate(Routes.RUN) },
+                    )
+                }
+                composable(Routes.RUN_DETAIL) { entry ->
+                    RunDetailScreen(
+                        entry.arguments?.getString("id").orEmpty(),
+                        onBack = { nav.popBackStack() },
+                        onSword = { nav.navigate(Routes.sword(it)) },
+                    )
+                }
+                composable(Routes.RUN_STATS) { RunningStatsScreen(onBack = { nav.popBackStack() }) }
                 composable(Routes.CODEX) {
                     CodexScreen(onBack = { nav.popBackStack() }, onCourse = { nav.navigate(Routes.course(it)) })
                 }

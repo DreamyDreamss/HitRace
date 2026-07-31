@@ -233,6 +233,72 @@ data class CodexEntry(
     val shape: Shape = Shape(),
 )
 
+// ── Running log ─────────────────────────────────────────────────────────────
+
+@Serializable
+data class RunSummary(
+    val id: String,
+    val status: String = "recorded",
+    val distanceKm: Double = 0.0,
+    val durationSec: Int = 0,
+    val avgPaceSecPerKm: Int = 0,
+    val elevationGainM: Int = 0,
+    val courseHash: String = "",
+    val swordId: String? = null,
+    val startedAt: Long = 0,
+    val createdAt: Long = 0,
+) {
+    val isIndoor: Boolean get() = courseHash.startsWith("treadmill")
+}
+
+@Serializable
+data class Split(
+    val km: Int,
+    val distanceKm: Double = 1.0,
+    val durationSec: Int = 0,
+    val paceSecPerKm: Int = 0,
+    val elevationGainM: Int = 0,
+)
+
+@Serializable
+data class RunDetailResp(
+    val run: RunSummary,
+    val route: List<GpsPointDto> = emptyList(),
+    val splits: List<Split> = emptyList(),
+    val bestKmPaceSecPerKm: Int? = null,
+    val sword: Sword? = null,
+)
+
+@Serializable
+data class VolumeStat(
+    val runs: Int = 0,
+    val distanceKm: Double = 0.0,
+    val durationSec: Int = 0,
+    val avgPaceSecPerKm: Int = 0,
+)
+
+@Serializable
+data class WeeklyBucket(val weekStart: Long = 0, val distanceKm: Double = 0.0, val runs: Int = 0)
+
+@Serializable
+data class PersonalBests(
+    val longestKm: Double = 0.0,
+    val longestDurationSec: Int = 0,
+    val fastestPaceSecPerKm: Int = 0,
+    val biggestClimbM: Int = 0,
+    val longestStreakDays: Int = 0,
+)
+
+@Serializable
+data class RunningStats(
+    val thisWeek: VolumeStat = VolumeStat(),
+    val lastWeek: VolumeStat = VolumeStat(),
+    val thisMonth: VolumeStat = VolumeStat(),
+    val allTime: VolumeStat = VolumeStat(),
+    val weekly: List<WeeklyBucket> = emptyList(),
+    val personalBests: PersonalBests = PersonalBests(),
+)
+
 @Serializable
 data class CourseScoreRow(
     val rank: Int,

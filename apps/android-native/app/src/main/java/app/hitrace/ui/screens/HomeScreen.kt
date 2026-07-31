@@ -1,5 +1,6 @@
 package app.hitrace.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -28,14 +29,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hitrace.AppViewModel
 import app.hitrace.data.MeResp
+import app.hitrace.data.RunMath
 import app.hitrace.data.Sword
 import app.hitrace.data.tierLabel
 import app.hitrace.ui.BladeCanvas
 import app.hitrace.ui.theme.Rb
 
 @Composable
-fun HomeScreen(vm: AppViewModel, me: MeResp, onStartRun: () -> Unit = {}, onGacha: () -> Unit = {}) {
+fun HomeScreen(
+    vm: AppViewModel,
+    me: MeResp,
+    onStartRun: () -> Unit = {},
+    onGacha: () -> Unit = {},
+    onStats: () -> Unit = {},
+) {
     val ranking by vm.ranking.collectAsState()
+    // This is a running app first: the week's volume belongs above the fold.
+    val stats = app.hitrace.ui.rememberLoad { app.hitrace.data.ApiClient.api.runningStats() }
     val sc = rememberScrollState()
     Column(
         Modifier.fillMaxSize().background(Rb.Bg).verticalScroll(sc).padding(20.dp),
@@ -50,6 +60,36 @@ fun HomeScreen(vm: AppViewModel, me: MeResp, onStartRun: () -> Unit = {}, onGach
             CurrencyPill(Rb.Blue, me.wallet.ore)
             Spacer(Modifier.width(6.dp))
             CurrencyPill(Rb.Gold, me.wallet.forgeTicket)
+        }
+
+        // 이번 주 러닝 — tap to open the full stats.
+        Card {
+            Column(
+                Modifier.fillMaxWidth().clickable(onClick = onStats).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("이번 주 러닝", color = Rb.Text3, fontSize = 12.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text("통계 ›", color = Rb.Blue, fontSize = 12.sp)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        "%.1f".format(stats?.thisWeek?.distanceKm ?: 0.0),
+                        color = Rb.Gold, fontFamily = FontFamily.Monospace, fontSize = 28.sp, fontWeight = FontWeight.Bold,
+                    )
+                    Text("km", color = Rb.Muted, fontSize = 12.sp, modifier = Modifier.padding(start = 3.dp, bottom = 4.dp))
+                    Spacer(Modifier.weight(1f))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("${stats?.thisWeek?.runs ?: 0}회", color = Rb.Text2, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+                        Text(
+                            stats?.thisWeek?.avgPaceSecPerKm?.takeIf { it > 0 }
+                                ?.let { RunMath.paceLabel(it.toDouble()) + " /km" } ?: "—",
+                            color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                        )
+                    }
+                }
+            }
         }
 
         me.equipped?.let { EquippedCard(it) }
