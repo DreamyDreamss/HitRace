@@ -60,7 +60,23 @@ fun RunHistoryScreen(onBack: () -> Unit, onOpen: (String) -> Unit, onStartRun: (
                 }
             }
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(runs) { r -> RunRow(r, onClick = { onOpen(r.id) }) }
+                // Grouped by month with that month's volume — a log without totals is just a list.
+                runs.groupBy { monthLabel(it.startedAt) }.forEach { (month, monthRuns) ->
+                    item(key = "h-$month") {
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(month, color = Rb.Text3, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                "%.1fkm · %d회".format(monthRuns.sumOf { it.distanceKm }, monthRuns.size),
+                                color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                            )
+                        }
+                    }
+                    items(monthRuns, key = { it.id }) { r -> RunRow(r, onClick = { onOpen(r.id) }) }
+                }
             }
         }
     }
@@ -120,6 +136,12 @@ private val timeFmt = SimpleDateFormat("a h:mm", Locale.KOREAN)
 
 fun dayLabel(ts: Long): String = dayFmt.format(Date(ts))
 fun timeLabel(ts: Long): String = timeFmt.format(Date(ts))
+
+private val shortFmt = SimpleDateFormat("M/d (E)", Locale.KOREAN)
+private val monthFmt = SimpleDateFormat("yyyy년 M월", Locale.KOREAN)
+
+fun shortDay(ts: Long): String = shortFmt.format(Date(ts))
+fun monthLabel(ts: Long): String = monthFmt.format(Date(ts))
 
 /** 1:23:45 for long runs, 23:45 for short ones. */
 fun hms(sec: Int): String {

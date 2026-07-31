@@ -42,10 +42,13 @@ fun HomeScreen(
     onStartRun: () -> Unit = {},
     onGacha: () -> Unit = {},
     onStats: () -> Unit = {},
+    onHistory: () -> Unit = {},
+    onRun: (String) -> Unit = {},
 ) {
     val ranking by vm.ranking.collectAsState()
     // This is a running app first: the week's volume belongs above the fold.
     val stats = app.hitrace.ui.rememberLoad { app.hitrace.data.ApiClient.api.runningStats() }
+    val recent = app.hitrace.ui.rememberLoad { app.hitrace.data.ApiClient.api.runs(3) }
     val sc = rememberScrollState()
     Column(
         Modifier.fillMaxSize().background(Rb.Bg).verticalScroll(sc).padding(20.dp),
@@ -111,6 +114,45 @@ fun HomeScreen(
         }
 
         me.equipped?.let { EquippedCard(it) }
+
+        // Recent runs — a running app should show the last thing you ran, not make you dig.
+        recent?.takeIf { it.isNotEmpty() }?.let { runs ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("최근 러닝", color = Rb.Text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "전체 기록 ›", color = Rb.Blue, fontSize = 12.sp,
+                    modifier = Modifier.clickable(onClick = onHistory),
+                )
+            }
+            Card {
+                Column {
+                    runs.forEach { r ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { onRun(r.id) }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                shortDay(r.startedAt), color = Rb.Text3,
+                                fontFamily = FontFamily.Monospace, fontSize = 12.sp,
+                                maxLines = 1,
+                                modifier = Modifier.width(78.dp),
+                            )
+                            Text(
+                                "%.2fkm".format(r.distanceKm), color = Rb.Text,
+                                fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                            )
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                RunMath.paceLabel(r.avgPaceSecPerKm.toDouble()), color = Rb.Text3,
+                                fontFamily = FontFamily.Monospace, fontSize = 12.sp,
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // Stat row
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

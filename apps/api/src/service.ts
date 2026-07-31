@@ -409,7 +409,27 @@ export class GameService {
     const route = run.route ?? [];
     const splits = computeSplits(route);
     const sword = run.swordId ? await this.repo.getSword(run.swordId) : undefined;
+
+    // Same-course history: "3rd time here, and your fastest" is the comparison that makes
+    // a runner want to repeat a route.
+    const sameCourse = (await this.repo.listRuns(userId, 200))
+      .filter((r) => r.courseHash === run.courseHash && r.distanceKm >= 1 && r.avgPaceSecPerKm > 0);
+    const coursePaces = sameCourse.map((r) => r.avgPaceSecPerKm);
+    const courseBestPace = coursePaces.length ? Math.min(...coursePaces) : undefined;
+    const previous = sameCourse
+      .filter((r) => r.id !== run.id && r.startedAt < run.startedAt)
+      .sort((a, b) => b.startedAt - a.startedAt)[0];
+
     return {
+      course: {
+        totalRuns: sameCourse.length,
+        // Attempt number of *this* run on this course, oldest = 1.
+        attempt: sameCourse.filter((r) => r.startedAt <= run.startedAt).length,
+        bestPaceSecPerKm: courseBestPace,
+        isCourseBest: courseBestPace != null && run.avgPaceSecPerKm <= courseBestPace,
+        previousPaceSecPerKm: previous?.avgPaceSecPerKm,
+        deltaVsPreviousSec: previous ? run.avgPaceSecPerKm - previous.avgPaceSecPerKm : undefined,
+      },
       run: {
         id: run.id, status: run.status, distanceKm: run.distanceKm, durationSec: run.durationSec,
         avgPaceSecPerKm: run.avgPaceSecPerKm, elevationGainM: run.elevationGainM,

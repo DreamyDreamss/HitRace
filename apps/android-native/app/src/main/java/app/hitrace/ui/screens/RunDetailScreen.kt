@@ -96,6 +96,44 @@ fun RunDetailScreen(runId: String, onBack: () -> Unit, onSword: (String) -> Unit
             )
         }
 
+        // Same course, run before? Then the only number that matters is the difference.
+        if (!run.isIndoor && data.course.totalRuns > 1) {
+            RbCard {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("같은 코스 ${data.course.attempt}회차", color = Rb.Text2, fontSize = 13.sp)
+                        Spacer(Modifier.weight(1f))
+                        if (data.course.isCourseBest) {
+                            Text(
+                                "🏅 코스 최고 기록", color = Rb.Gold, fontSize = 11.sp,
+                                modifier = Modifier.clip(RoundedCornerShape(999.dp))
+                                    .background(Rb.Gold.copy(alpha = 0.13f))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                    data.course.deltaVsPreviousSec?.let { d ->
+                        val faster = d < 0
+                        Text(
+                            when {
+                                d == 0 -> "직전과 같은 페이스"
+                                faster -> "직전보다 km당 ${-d}초 빨라졌습니다"
+                                else -> "직전보다 km당 ${d}초 느렸습니다"
+                            },
+                            color = if (faster) Rb.Green else Rb.Muted,
+                            fontFamily = FontFamily.Monospace, fontSize = 12.sp,
+                        )
+                    }
+                    data.course.bestPaceSecPerKm?.let {
+                        Text(
+                            "코스 최고 ${RunMath.paceLabel(it.toDouble())} /km",
+                            color = Rb.Text3, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+                        )
+                    }
+                }
+            }
+        }
+
         // Splits: bar length is relative to the slowest km, so the shape reads at a glance.
         if (data.splits.isNotEmpty()) {
             Eyebrow("SPLITS")

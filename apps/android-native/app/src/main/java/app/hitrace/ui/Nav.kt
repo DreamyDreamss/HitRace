@@ -120,6 +120,8 @@ fun MainScaffold(vm: AppViewModel, me: MeResp) {
                         onStartRun = { nav.navigate(Routes.RUN) },
                         onGacha = { nav.navigate(Routes.GACHA) },
                         onStats = { nav.navigate(Routes.RUN_STATS) },
+                        onHistory = { nav.navigate(Routes.RUN_HISTORY) },
+                        onRun = { nav.navigate(Routes.runDetail(it)) },
                     )
                 }
                 composable(Routes.COLLECTION) {

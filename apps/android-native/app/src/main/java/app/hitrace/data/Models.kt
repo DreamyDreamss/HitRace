@@ -265,8 +265,19 @@ data class Split(
 )
 
 @Serializable
+data class CourseCompare(
+    val totalRuns: Int = 0,
+    val attempt: Int = 0,
+    val bestPaceSecPerKm: Int? = null,
+    val isCourseBest: Boolean = false,
+    val previousPaceSecPerKm: Int? = null,
+    val deltaVsPreviousSec: Int? = null,
+)
+
+@Serializable
 data class RunDetailResp(
     val run: RunSummary,
+    val course: CourseCompare = CourseCompare(),
     val route: List<GpsPointDto> = emptyList(),
     val splits: List<Split> = emptyList(),
     val bestKmPaceSecPerKm: Int? = null,

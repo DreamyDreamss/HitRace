@@ -135,6 +135,27 @@ describe('running log', () => {
     expect(body.sword.id).toBe(forged.swordId);
   });
 
+  it('compares a run against previous attempts on the same course', async () => {
+    const login = await app.inject({ method: 'POST', url: '/auth/dev/login', payload: { handle: 'course_repeat' } });
+    const t = JSON.parse(login.body).token;
+    const h = { authorization: `Bearer ${t}` };
+    const course = () => synthRun(4, 330, 'line'); // identical geometry ⇒ same course hash
+
+    await app.inject({ method: 'POST', url: '/runs', headers: h, payload: { track: course(), forge: false } });
+    const second = JSON.parse((await app.inject({
+      method: 'POST', url: '/runs', headers: h, payload: { track: course(), forge: false },
+    })).body);
+
+    const detail = JSON.parse((await app.inject({
+      method: 'GET', url: `/runs/${second.run.id}`, headers: h,
+    })).body);
+    expect(detail.course.totalRuns).toBe(2);
+    expect(detail.course.attempt).toBe(2);
+    expect(detail.course.bestPaceSecPerKm).toBeGreaterThan(0);
+    expect(detail.course.previousPaceSecPerKm).toBeGreaterThan(0);
+    expect(detail.course.deltaVsPreviousSec).toBeDefined();
+  });
+
   it('404s a run that belongs to someone else', async () => {
     const other = await app.inject({ method: 'POST', url: '/auth/dev/login', payload: { handle: 'nosy' } });
     const otherToken = JSON.parse(other.body).token;
