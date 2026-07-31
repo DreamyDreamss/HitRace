@@ -111,7 +111,10 @@ fun MainScaffold(vm: AppViewModel, me: MeResp) {
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
     fun toHome() = nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
-    Column(Modifier.fillMaxSize().background(Rb.Bg).statusBarsPadding()) {
+    // Insets are applied once, here, for every screen. Previously only the bottom *tab bar*
+    // handled them, so stack screens (요약·주조·전투…) drew their bottom buttons underneath the
+    // system navigation bar — on a 3-button device that swallows the taps entirely.
+    Column(Modifier.fillMaxSize().background(Rb.Bg).statusBarsPadding().navigationBarsPadding()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             NavHost(nav, startDestination = Routes.HOME) {
                 composable(Routes.HOME) {
@@ -232,9 +235,8 @@ private fun BottomNav(nav: NavController) {
     val entry by nav.currentBackStackEntryAsState()
     val current = entry?.destination?.route
     Row(
-        // navigationBarsPadding() BEFORE height() so the gesture bar is added around the 62dp
-        // row instead of eating into it (labels were being clipped).
-        Modifier.fillMaxWidth().background(Rb.Screen).navigationBarsPadding().height(62.dp),
+        // The scaffold already insets for the system bars, so this row is a plain 62dp strip.
+        Modifier.fillMaxWidth().background(Rb.Screen).height(62.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TABS.forEach { tab ->

@@ -575,7 +575,16 @@ export class GameService {
     const wallet = await this.wallet(userId);
     const swords = await this.listSwords(userId);
     const equipped = user?.equippedSwordId ? swords.find((s) => s.id === user.equippedSwordId) : undefined;
-    return { user, wallet, swordCount: swords.length, equipped };
+    // Today's forge budget, so the client can say "2/2 used" instead of letting the user
+    // tap a button that will fail.
+    const forgedToday = await this.repo.countForgesOnDay(userId, startOfDay(Date.now()));
+    return {
+      user,
+      wallet,
+      swordCount: swords.length,
+      equipped,
+      forge: { today: forgedToday, max: BALANCE.run.maxForgesPerDay },
+    };
   }
 
   async wallet(userId: string): Promise<Record<Currency, number>> {

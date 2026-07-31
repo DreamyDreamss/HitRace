@@ -1,5 +1,7 @@
 package app.hitrace.ui.screens
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -28,6 +31,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.hitrace.AuthState
 import app.hitrace.AppViewModel
 import app.hitrace.data.ApiClient
 import app.hitrace.data.RunBody
@@ -74,7 +78,15 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
         }
     }
 
-    Column(Modifier.fillMaxSize().background(Rb.Bg).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    // The forge budget is known up front, so the button can say why it is unavailable
+    // instead of failing on tap.
+    val budget = (vm.auth.collectAsState().value as? AuthState.LoggedIn)?.me?.forge
+    val capReached = budget?.exhausted == true
+
+    Column(
+        Modifier.fillMaxSize().background(Rb.Bg).verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("러닝 완료", color = Rb.Text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
@@ -107,13 +119,39 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
             }
         }
         if (err != null) Text(err!!, color = Rb.Red, fontSize = 12.5.sp)
-        Spacer(Modifier.weight(1f))
+        budget?.takeIf { !it.exhausted }?.let {
+            Text("오늘 주조 ${it.today}/${it.max}", color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+        }
+        if (capReached) {
+            Text(
+                "오늘 주조 한도(${budget?.max ?: 2}자루)를 모두 썼습니다 — 기록은 그대로 저장됩니다.",
+                color = Rb.Text3, fontSize = 12.5.sp,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedBtn("기록만 저장", Modifier.weight(1f)) { if (!busy) submit(false) }
-            Button(onClick = { if (!busy) submit(true) }, modifier = Modifier.weight(1.6f).height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) {
-                Text(if (busy) "주조 중…" else "검 주조하기", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Button(
+                onClick = { if (!busy && !capReached) submit(true) },
+                enabled = !busy && !capReached,
+                modifier = Modifier.weight(1.6f).height(54.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Rb.Gold, contentColor = Rb.Screen,
+                    disabledContainerColor = Rb.Surface3, disabledContentColor = Rb.Muted,
+                ),
+            ) {
+                Text(
+                    when {
+                        busy -> "주조 중…"
+                        capReached -> "내일 다시 주조"
+                        else -> "검 주조하기"
+                    },
+                    fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                )
             }
         }
+        Spacer(Modifier.height(8.dp))
     }
 }
 

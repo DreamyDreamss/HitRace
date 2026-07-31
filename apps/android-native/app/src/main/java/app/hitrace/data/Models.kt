@@ -74,11 +74,18 @@ data class LoginBody(val handle: String)
 data class LoginResp(val token: String, val user: User)
 
 @Serializable
+data class ForgeBudget(val today: Int = 0, val max: Int = 2) {
+    val remaining: Int get() = (max - today).coerceAtLeast(0)
+    val exhausted: Boolean get() = remaining <= 0
+}
+
+@Serializable
 data class MeResp(
     val user: User,
     val wallet: Wallet,
     val swordCount: Int = 0,
     val equipped: Sword? = null,
+    val forge: ForgeBudget = ForgeBudget(),
 )
 
 @Serializable
