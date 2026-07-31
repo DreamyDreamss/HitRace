@@ -25,6 +25,23 @@ Shareable replay links are the only web feature left and are **blocked on a host
 (see `docs/OPEN_DECISIONS.md` §4). Next: QA sweep (empty/error states, long names, a11y) and a
 consistency check between `data/Balance.kt` and `packages/game-core`.
 
+## 러닝 로그 (2026-07-31, "러닝 앱다운 기능" 요청)
+게임(검)만 있고 정작 달린 기록이 안 보인다는 지적에서 시작. 6번의 이터레이션:
+1. **기록 저장** — `runs.track`에 `'{}'`만 넣고 있었습니다. 300점 다운샘플 경로를 실제로 저장.
+   game-core `computeSplits`(km 경계 보간, 희소 샘플 대응) + `service.listRuns/runDetail/runningStats`.
+2. **화면** — 러닝 기록 목록 / 상세(경로·구간 페이스 막대·주조한 검) / 통계(이번주 vs 지난주,
+   12주 추이, 누적, 개인기록 5종) + 홈 이번 주 카드.
+3. **주간 목표 + 개인기록** — `users.weekly_goal_km`, 통계 화면 프리셋 탭, 홈 진행률.
+   러닝 저장 *전에* 과거와 비교해 PB 플래그 → 주조 화면 🏆 배지.
+4. **코스 비교** — 같은 코스 몇 회차·직전 대비 초·코스 최고 기록 배지. 홈 최근 러닝 3건,
+   기록 월별 그룹(월 합계).
+5. **프로필 재구성** — 누적 거리/시간/평균 페이스가 최상단, PB 3종, 검은 COLLECTION으로.
+   러닝 상세에 고도 그래프(x축은 누적 거리).
+6. **목표 보상 + 랩 페이스** — 목표를 넘긴 러닝이 보너스 지급(교차 자체가 멱등 키),
+   러닝 중 "현재 1km 페이스".
+
+엔진 69 · API 34 · 네이티브 9 테스트. 모두 Supabase에 배포·검증 완료.
+
 ## Background run tracking (2026-07-29, user decision §7)
 - `service/RunTrackingService` — a `location`-typed foreground service owns FusedLocation and the
   demo simulation; `data/RunTracker` is the process-wide state the UI observes. The Running screen
