@@ -92,6 +92,21 @@ fun RunningScreen(onBack: () -> Unit, onFinish: () -> Unit, onManual: () -> Unit
             Metric(Modifier.weight(1f), "시간", fmt(m.durationSec), null)
         }
 
+        // Current-kilometre pace: the number that tells you to speed up *now*, unlike the
+        // run average which barely moves after the first few minutes.
+        if (status != RunStatus.IDLE) {
+            val lap = remember(points, tick) { RunMath.lastKmPace(points) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("현재 1km 페이스", color = Rb.Muted, fontSize = 12.sp)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (lap > 0) RunMath.paceLabel(lap) + " /km" else "1km 이후 표시",
+                    color = if (lap > 0) Rb.Gold2 else Rb.Muted,
+                    fontFamily = FontFamily.Monospace, fontSize = 13.sp,
+                )
+            }
+        }
+
         Box(Modifier.fillMaxWidth().height(230.dp).clip(RoundedCornerShape(16.dp)).border(1.dp, Rb.Line, RoundedCornerShape(16.dp))) {
             RouteTrace(points, Modifier.fillMaxSize())
             if (points.size < 2) {

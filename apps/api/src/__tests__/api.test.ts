@@ -213,6 +213,34 @@ describe('running log', () => {
     expect(third.records.fastestPace).toBe(true);
   });
 
+  it('pays the weekly-goal bonus exactly once, on the run that crosses it', async () => {
+    const login = await app.inject({ method: 'POST', url: '/auth/dev/login', payload: { handle: 'goal_crosser' } });
+    const t = JSON.parse(login.body).token;
+    const h = { authorization: `Bearer ${t}` };
+    await app.inject({ method: 'POST', url: '/stats/goal', headers: h, payload: { weeklyGoalKm: 10 } });
+
+    const first = JSON.parse((await app.inject({
+      method: 'POST', url: '/runs', headers: h, payload: { track: synthRun(6, 330), forge: false },
+    })).body);
+    expect(first.weeklyGoal.achieved).toBe(false); // 6 < 10
+
+    const walletBefore = JSON.parse((await app.inject({ method: 'GET', url: '/wallet', headers: h })).body);
+    const crossing = JSON.parse((await app.inject({
+      method: 'POST', url: '/runs', headers: h, payload: { track: synthRun(5, 340), forge: false },
+    })).body);
+    expect(crossing.weeklyGoal.achieved).toBe(true); // 11 ≥ 10
+    expect(crossing.weeklyGoal.bonus.forgeTicket).toBe(1);
+    const walletAfter = JSON.parse((await app.inject({ method: 'GET', url: '/wallet', headers: h })).body);
+    // The crossing run pays twice: its own distance reward *and* the goal bonus.
+    expect(walletAfter.forgeTicket).toBe(walletBefore.forgeTicket + crossing.rewards.forgeTicket + 1);
+
+    // Already past the goal: no second payout.
+    const third = JSON.parse((await app.inject({
+      method: 'POST', url: '/runs', headers: h, payload: { track: synthRun(4, 350), forge: false },
+    })).body);
+    expect(third.weeklyGoal.achieved).toBe(false);
+  });
+
   it('summarises weekly/monthly volume and personal bests', async () => {
     const res = await app.inject({ method: 'GET', url: '/stats/running', headers: H() });
     expect(res.statusCode).toBe(200);

@@ -68,6 +68,24 @@ object RunMath {
     fun oreReward(distanceKm: Double) = (distanceKm * 8).roundToInt()
     fun ticketReward(distanceKm: Double) = if (distanceKm >= 3) 1 else 0
 
+    /**
+     * Pace over the most recent kilometre — what a runner glances down for mid-run.
+     * Returns 0 until a full kilometre of history exists (a partial lap would read
+     * wildly fast or slow and be worse than showing nothing).
+     */
+    fun lastKmPace(pts: List<GpsPointDto>): Double {
+        if (pts.size < 2) return 0.0
+        var meters = 0.0
+        var i = pts.size - 1
+        while (i > 0 && meters < 1000.0) {
+            meters += haversine(pts[i - 1], pts[i])
+            i--
+        }
+        if (meters < 1000.0) return 0.0
+        val sec = (pts.last().t - pts[i].t) / 1000.0
+        return if (sec > 0) sec / (meters / 1000.0) else 0.0
+    }
+
     fun paceLabel(secPerKm: Double): String {
         if (secPerKm <= 0) return "—'—\""
         val m = (secPerKm / 60).toInt(); val s = (secPerKm % 60).roundToInt()

@@ -153,7 +153,9 @@ export class GameService {
       await this.repo.recordCourseScore({ courseHash, userId, handle: user.handle, bestScore: score.total, bestCp: sword.cp, at: now });
     }
 
-    return { run: rec, sword: opts.forge ? sword : undefined, metrics, rewards, records };
+    const weeklyGoal = await this.grantWeeklyGoalBonus(userId, metrics.distanceKm, now);
+
+    return { run: rec, sword: opts.forge ? sword : undefined, metrics, rewards, records, weeklyGoal };
   }
 
   // ── Manual / treadmill forge (no GPS) ──────────────────────────────────────
@@ -192,7 +194,9 @@ export class GameService {
     await this.repo.addSeasonKm(userId, distanceKm);
     await this.bumpStreak(userId, now);
 
-    return { sword, rewards: { ore, forgeTicket: 0 }, records };
+    const weeklyGoal = await this.grantWeeklyGoalBonus(userId, distanceKm, now);
+
+    return { sword, rewards: { ore, forgeTicket: 0 }, records, weeklyGoal };
   }
 
   private async grantRunRewards(userId: string, distanceKm: number, refId: string, now: number) {
@@ -497,6 +501,37 @@ export class GameService {
         longestStreakDays: user?.streakDays ?? 0,
       },
     };
+  }
+
+  /**
+   * Bonus for crossing the weekly goal, granted by the run that crosses it.
+   *
+   * No "already claimed this week" flag needed: only one run can take the total from
+   * below the goal to at or above it, so the crossing itself is the idempotency key.
+   */
+  private async grantWeeklyGoalBonus(userId: string, runKm: number, now: number) {
+    const user = await this.repo.getUser(userId);
+    const goal = user?.weeklyGoalKm ?? DEFAULT_WEEKLY_GOAL_KM;
+    if (goal <= 0) return { achieved: false as const };
+
+    const weekStart = startOfWeek(now);
+    // listRuns already contains the run we just stored.
+    const weekKm = (await this.repo.listRuns(userId, 200))
+      .filter((r) => r.startedAt >= weekStart)
+      .reduce((a, r) => a + r.distanceKm, 0);
+    const before = weekKm - runKm;
+    if (!(before < goal && weekKm >= goal)) return { achieved: false as const };
+
+    const ticket = BALANCE.economy.ticket.weekly3RunsBonus > 0 ? 1 : 0;
+    const oreEarned = await this.repo.earnedSince(userId, 'ore', startOfDay(now));
+    const { granted: ore } = grantCapped(oreEarned, 150, BALANCE.economy.caps.oreDaily);
+    if (ore > 0) {
+      await this.repo.applyCurrency({ userId, currency: 'ore', delta: ore, reason: 'weekly_goal', createdAt: now });
+    }
+    if (ticket > 0) {
+      await this.repo.applyCurrency({ userId, currency: 'forgeTicket', delta: ticket, reason: 'weekly_goal', createdAt: now });
+    }
+    return { achieved: true as const, goalKm: goal, weekKm: round1(weekKm), bonus: { ore, forgeTicket: ticket } };
   }
 
   /** Change the weekly distance target. 0 turns the goal off. */

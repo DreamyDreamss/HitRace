@@ -51,6 +51,7 @@ fun ForgeResultScreen(onDone: () -> Unit) {
         Text("달린 경로가 검이 되었습니다", color = Rb.Text3, fontSize = 13.sp)
         // Records earned by the run that made this blade — the running half of the reward.
         RecordBadges(RunSession.records)
+        GoalBanner(RunSession.weeklyGoal)
         Spacer(Modifier.weight(1f))
         BladeCanvas(sword.shape, sword.rarity, glow = true, modifier = Modifier.size(150.dp, 320.dp).scale(0.6f + 0.4f * reveal.value).alpha(reveal.value))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -62,6 +63,23 @@ fun ForgeResultScreen(onDone: () -> Unit) {
         Button(onClick = { RunSession.track = null; RunSession.forged = null; onDone() }, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) {
             Text("완료", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
+    }
+}
+
+/** Weekly goal crossed by this run — the payout is shown where the reward lands. */
+@Composable
+private fun GoalBanner(g: app.hitrace.data.WeeklyGoalResult) {
+    if (!g.achieved) return
+    Column(
+        Modifier.clip(RoundedCornerShape(12.dp)).background(Rb.Green.copy(alpha = 0.12f))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("🎉 이번 주 목표 ${g.goalKm}km 달성", color = Rb.Green, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "이번 주 %.1fkm · 보너스 철광석 %d · 티켓 %d".format(g.weekKm, g.bonus.ore, g.bonus.forgeTicket),
+            color = Rb.Text3, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
+        )
     }
 }
 

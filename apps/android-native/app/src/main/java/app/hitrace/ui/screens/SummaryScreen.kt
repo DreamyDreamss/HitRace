@@ -60,6 +60,7 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
                 .onSuccess { res ->
                     vm.refresh()
                     RunSession.records = res.records
+                    RunSession.weeklyGoal = res.weeklyGoal
                     if (forge && res.sword != null) { RunSession.forged = res.sword; onForged() } else onSavedOnly()
                 }
                 .onFailure {

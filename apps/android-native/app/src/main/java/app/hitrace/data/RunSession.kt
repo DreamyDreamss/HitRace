@@ -6,6 +6,8 @@ object RunSession {
     var forged: Sword? = null
     /** Personal bests the just-finished run set; consumed by the forge/summary screen. */
     var records: RunRecords = RunRecords()
+    /** Weekly-goal payout from the just-finished run, if it crossed the line. */
+    var weeklyGoal: WeeklyGoalResult = WeeklyGoalResult()
 }
 
 // Keeps the in-progress workshop transform alive across Workshop → 부위 지정 → Workshop

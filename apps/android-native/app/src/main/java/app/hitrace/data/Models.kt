@@ -102,10 +102,23 @@ data class TrackDto(
 data class RunBody(val track: TrackDto, val forge: Boolean = true, val name: String? = null)
 
 @Serializable
+data class GoalBonus(val ore: Int = 0, val forgeTicket: Int = 0)
+
+/** Returned when a run pushes the week's total across the goal. */
+@Serializable
+data class WeeklyGoalResult(
+    val achieved: Boolean = false,
+    val goalKm: Int = 0,
+    val weekKm: Double = 0.0,
+    val bonus: GoalBonus = GoalBonus(),
+)
+
+@Serializable
 data class ForgeResult(
     val sword: Sword? = null,
     val rewards: Rewards = Rewards(),
     val records: RunRecords = RunRecords(),
+    val weeklyGoal: WeeklyGoalResult = WeeklyGoalResult(),
 )
 
 @Serializable
