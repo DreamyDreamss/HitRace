@@ -1,5 +1,15 @@
 package app.hitrace.ui.screens
 
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import app.hitrace.data.GoalBody
+import app.hitrace.data.GoalStat
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +64,7 @@ fun RunningStatsScreen(onBack: () -> Unit) {
         Text("러닝 통계", color = Rb.Text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
 
         WeekCompareCard(stats.thisWeek, stats.lastWeek)
+        GoalCard(stats.goal, thisWeekKm = stats.thisWeek.distanceKm)
 
         Eyebrow("최근 12주")
         RbCard {
@@ -75,6 +86,63 @@ fun RunningStatsScreen(onBack: () -> Unit) {
         Eyebrow("개인 기록")
         PersonalBestCards(stats.personalBests)
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+/** Weekly goal with inline presets — changing it is one tap, no dialog. */
+@Composable
+private fun GoalCard(initial: GoalStat, thisWeekKm: Double) {
+    val scope = rememberCoroutineScope()
+    var goal by remember(initial.weeklyGoalKm) { mutableIntStateOf(initial.weeklyGoalKm) }
+    var busy by remember { mutableStateOf(false) }
+    val progress = if (goal > 0) (thisWeekKm / goal).coerceIn(0.0, 1.0) else 0.0
+    val remaining = (goal - thisWeekKm).coerceAtLeast(0.0)
+
+    RbCard {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("주간 목표", color = Rb.Text3, fontSize = 13.sp)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (goal > 0) "$goal km" else "설정 안 함",
+                    color = Rb.Gold, fontFamily = FontFamily.Monospace, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Meter(progress.toFloat(), if (progress >= 1.0) Rb.Green else Rb.Gold)
+            Text(
+                when {
+                    goal == 0 -> "목표를 정하면 이번 주 진행률을 홈에서 볼 수 있습니다."
+                    progress >= 1.0 -> "이번 주 목표 달성 🎉 (%.1fkm)".format(thisWeekKm)
+                    else -> "%.1fkm 남음 · %d일 남음".format(remaining, initial.daysLeftInWeek)
+                },
+                color = if (progress >= 1.0) Rb.Green else Rb.Muted, fontSize = 11.5.sp,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(0, 10, 20, 30, 50).forEach { km ->
+                    val selected = goal == km
+                    Box(
+                        Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                            .background(if (selected) Rb.Gold.copy(alpha = 0.14f) else Rb.Surface3)
+                            .clickable(enabled = !busy) {
+                                goal = km
+                                busy = true
+                                scope.launch {
+                                    runCatching { ApiClient.api.setWeeklyGoal(GoalBody(km)) }
+                                    busy = false
+                                }
+                            }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            if (km == 0) "없음" else "$km",
+                            color = if (selected) Rb.Gold else Rb.Text3,
+                            fontFamily = FontFamily.Monospace, fontSize = 12.sp,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

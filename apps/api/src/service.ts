@@ -62,6 +62,11 @@ function startOfWeek(ts: number): number {
   d.setDate(d.getDate() - day);
   return d.getTime();
 }
+const DEFAULT_WEEKLY_GOAL_KM = 20;
+
+function round2(v: number): number {
+  return Math.round(v * 100) / 100;
+}
 function startOfMonth(ts: number): number {
   const d = new Date(ts);
   d.setHours(0, 0, 0, 0);
@@ -133,6 +138,8 @@ export class GameService {
       route: decimate(track.points, 300),
       swordId: opts.forge ? swordId : undefined,
     };
+    // Compare against history *before* the row lands, then store.
+    const records = await this.detectRecords(userId, rec);
     await this.repo.createRun(rec);
 
     // Rewards (ore capped daily; tickets uncapped) — always granted for a valid run.
@@ -146,7 +153,7 @@ export class GameService {
       await this.repo.recordCourseScore({ courseHash, userId, handle: user.handle, bestScore: score.total, bestCp: sword.cp, at: now });
     }
 
-    return { run: rec, sword: opts.forge ? sword : undefined, metrics, rewards };
+    return { run: rec, sword: opts.forge ? sword : undefined, metrics, rewards, records };
   }
 
   // ── Manual / treadmill forge (no GPS) ──────────────────────────────────────
@@ -168,11 +175,13 @@ export class GameService {
       ownerId: userId, runId, swordId, createdAt: now, repeatIndex, seed: `${userId}:${now}`, name,
     });
 
-    await this.repo.createRun({
-      id: runId, userId, status: 'forged', courseHash, repeatIndex,
+    const rec = {
+      id: runId, userId, status: 'forged' as const, courseHash, repeatIndex,
       distanceKm, durationSec: Math.round(distanceKm * paceSecPerKm), avgPaceSecPerKm: Math.round(paceSecPerKm),
-      elevationGainM: 0, startedAt: now, createdAt: now,
-    });
+      elevationGainM: 0, startedAt: now, createdAt: now, swordId,
+    };
+    const records = await this.detectRecords(userId, rec);
+    await this.repo.createRun(rec);
     await this.repo.addSword(sword);
     // Note: procedural blades are intentionally NOT recorded in the codex (kept for real GPS routes).
 
@@ -183,7 +192,7 @@ export class GameService {
     await this.repo.addSeasonKm(userId, distanceKm);
     await this.bumpStreak(userId, now);
 
-    return { sword, rewards: { ore, forgeTicket: 0 } };
+    return { sword, rewards: { ore, forgeTicket: 0 }, records };
   }
 
   private async grantRunRewards(userId: string, distanceKm: number, refId: string, now: number) {
@@ -444,8 +453,17 @@ export class GameService {
     const paced = runs.filter((r) => r.distanceKm >= 1 && r.avgPaceSecPerKm > 0);
     const user = await this.repo.getUser(userId);
     const all = sum(runs);
+    const goalKm = user?.weeklyGoalKm ?? DEFAULT_WEEKLY_GOAL_KM;
 
     return {
+      goal: {
+        weeklyGoalKm: goalKm,
+        // Days left counts today, so "1" on Sunday reads correctly.
+        daysLeftInWeek: 7 - Math.floor((now - weekStart) / 86_400_000),
+        remainingKm: round1(Math.max(0, goalKm - thisWeek.distanceKm)),
+        progress: goalKm > 0 ? Math.min(1, round2(thisWeek.distanceKm / goalKm)) : 0,
+        achieved: goalKm > 0 && thisWeek.distanceKm >= goalKm,
+      },
       thisWeek: { ...thisWeek, avgPaceSecPerKm: avgPace(inRange(weekStart)) },
       lastWeek,
       thisMonth: sum(inRange(monthStart)),
@@ -458,6 +476,41 @@ export class GameService {
         biggestClimbM: runs.length ? Math.max(...runs.map((r) => r.elevationGainM)) : 0,
         longestStreakDays: user?.streakDays ?? 0,
       },
+    };
+  }
+
+  /** Change the weekly distance target. 0 turns the goal off. */
+  async setWeeklyGoal(userId: string, km: number) {
+    if (!Number.isFinite(km) || km < 0 || km > 500) throw new ServiceError('invalid_goal', 422);
+    const user = await this.repo.updateUser(userId, { weeklyGoalKm: Math.round(km) });
+    return { weeklyGoalKm: user.weeklyGoalKm ?? DEFAULT_WEEKLY_GOAL_KM };
+  }
+
+  /**
+   * Which personal bests this run just beat. Called *before* the run is stored, so the
+   * comparison is against history only — otherwise every run would tie with itself.
+   */
+  private async detectRecords(
+    userId: string,
+    run: { distanceKm: number; durationSec: number; avgPaceSecPerKm: number; elevationGainM: number },
+  ) {
+    const prior = await this.repo.listRuns(userId, 200);
+    const best = <T>(pick: (r: (typeof prior)[number]) => T, cmp: (a: T, b: T) => boolean, init: T) =>
+      prior.reduce((acc, r) => (cmp(pick(r), acc) ? pick(r) : acc), init);
+
+    const longest = best((r) => r.distanceKm, (a, b) => a > b, 0);
+    const longestTime = best((r) => r.durationSec, (a, b) => a > b, 0);
+    const climb = best((r) => r.elevationGainM, (a, b) => a > b, 0);
+    const paced = prior.filter((r) => r.distanceKm >= 1 && r.avgPaceSecPerKm > 0);
+    const fastest = paced.length ? Math.min(...paced.map((r) => r.avgPaceSecPerKm)) : Infinity;
+
+    return {
+      firstRun: prior.length === 0,
+      longestDistance: run.distanceKm > longest,
+      longestDuration: run.durationSec > longestTime,
+      // A pace record only counts over a kilometre — a 300m dash is not a PB.
+      fastestPace: run.distanceKm >= 1 && run.avgPaceSecPerKm > 0 && run.avgPaceSecPerKm < fastest,
+      biggestClimb: run.elevationGainM > 0 && run.elevationGainM > climb,
     };
   }
 

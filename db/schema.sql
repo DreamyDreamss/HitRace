@@ -34,6 +34,7 @@ CREATE TABLE users (
   equipped_sword_id UUID,                          -- FK added after swords table
   gacha_pity      INT  NOT NULL DEFAULT 0,
   streak_days     INT  NOT NULL DEFAULT 0,          -- consecutive-day running streak
+  weekly_goal_km  INT  NOT NULL DEFAULT 20,         -- personal weekly distance target
   last_run_day    INT,                              -- epoch-day int of last run
 
   onboarded_at    TIMESTAMPTZ,

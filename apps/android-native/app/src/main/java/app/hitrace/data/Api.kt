@@ -71,6 +71,9 @@ interface HitRaceApi {
     @GET("stats/running")
     suspend fun runningStats(): RunningStats
 
+    @POST("stats/goal")
+    suspend fun setWeeklyGoal(@Body body: GoalBody): GoalStat
+
     @GET("codex")
     suspend fun codex(): CodexResp
 

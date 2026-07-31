@@ -100,6 +100,12 @@ export function buildServer(opts: BuildOpts): FastifyInstance {
   app.get('/stats/running', { preHandler: requireAuth }, async (req, reply) => {
     try { return await svc.runningStats(req.userId!); } catch (e) { return handle(reply, e); }
   });
+  app.post('/stats/goal', { preHandler: requireAuth }, async (req, reply) => {
+    try {
+      const km = Number((req.body as any)?.weeklyGoalKm);
+      return await svc.setWeeklyGoal(req.userId!, km);
+    } catch (e) { return handle(reply, e); }
+  });
 
   // ── Swords ───────────────────────────────────────────────────────────────────
   app.get('/swords', { preHandler: requireAuth }, async (req, reply) => {

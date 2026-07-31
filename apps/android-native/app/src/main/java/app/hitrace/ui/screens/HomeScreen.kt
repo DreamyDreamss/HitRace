@@ -79,6 +79,15 @@ fun HomeScreen(
                         color = Rb.Gold, fontFamily = FontFamily.Monospace, fontSize = 28.sp, fontWeight = FontWeight.Bold,
                     )
                     Text("km", color = Rb.Muted, fontSize = 12.sp, modifier = Modifier.padding(start = 3.dp, bottom = 4.dp))
+                    stats?.goal?.let { g ->
+                        if (g.weeklyGoalKm > 0) {
+                            Text(
+                                " / ${g.weeklyGoalKm}km",
+                                color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 13.sp,
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                        }
+                    }
                     Spacer(Modifier.weight(1f))
                     Column(horizontalAlignment = Alignment.End) {
                         Text("${stats?.thisWeek?.runs ?: 0}회", color = Rb.Text2, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
@@ -88,6 +97,15 @@ fun HomeScreen(
                             color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp,
                         )
                     }
+                }
+                // Goal progress: the "am I on track this week" glance.
+                stats?.goal?.takeIf { it.weeklyGoalKm > 0 }?.let { g ->
+                    Meter(g.progress.toFloat(), if (g.achieved) Rb.Green else Rb.Gold)
+                    Text(
+                        if (g.achieved) "이번 주 목표 달성 🎉"
+                        else "목표까지 %.1fkm · %d일 남음".format(g.remainingKm, g.daysLeftInWeek),
+                        color = if (g.achieved) Rb.Green else Rb.Text3, fontSize = 11.5.sp,
+                    )
                 }
             }
         }

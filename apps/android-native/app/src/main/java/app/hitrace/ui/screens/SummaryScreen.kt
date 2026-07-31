@@ -59,6 +59,7 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
             runCatching { ApiClient.api.submitRun(RunBody(track, forge)) }
                 .onSuccess { res ->
                     vm.refresh()
+                    RunSession.records = res.records
                     if (forge && res.sword != null) { RunSession.forged = res.sword; onForged() } else onSavedOnly()
                 }
                 .onFailure {

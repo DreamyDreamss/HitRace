@@ -145,6 +145,53 @@ describe('running log', () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it('tracks progress against a weekly goal and lets you change it', async () => {
+    const before = JSON.parse((await app.inject({ method: 'GET', url: '/stats/running', headers: H() })).body);
+    expect(before.goal.weeklyGoalKm).toBe(20); // default
+    expect(before.goal.progress).toBeGreaterThan(0);
+
+    const set = await app.inject({ method: 'POST', url: '/stats/goal', headers: H(), payload: { weeklyGoalKm: 60 } });
+    expect(set.statusCode).toBe(200);
+
+    const after = JSON.parse((await app.inject({ method: 'GET', url: '/stats/running', headers: H() })).body);
+    expect(after.goal.weeklyGoalKm).toBe(60);
+    expect(after.goal.progress).toBeLessThan(before.goal.progress);
+    expect(after.goal.remainingKm).toBeGreaterThan(0);
+    expect(after.goal.daysLeftInWeek).toBeGreaterThanOrEqual(1);
+    expect(after.goal.daysLeftInWeek).toBeLessThanOrEqual(7);
+
+    const bad = await app.inject({ method: 'POST', url: '/stats/goal', headers: H(), payload: { weeklyGoalKm: 9999 } });
+    expect(bad.statusCode).toBe(422);
+  });
+
+  it('flags personal records on the run that sets them, not on later ones', async () => {
+    const login = await app.inject({ method: 'POST', url: '/auth/dev/login', payload: { handle: 'pb_hunter' } });
+    const t = JSON.parse(login.body).token;
+    const h = { authorization: `Bearer ${t}` };
+
+    const first = JSON.parse((await app.inject({
+      method: 'POST', url: '/runs', headers: h, payload: { track: synthRun(5, 330), forge: false },
+    })).body);
+    expect(first.records.firstRun).toBe(true);
+    expect(first.records.longestDistance).toBe(true);
+    expect(first.records.fastestPace).toBe(true);
+
+    // Shorter and slower: no records.
+    const second = JSON.parse((await app.inject({
+      method: 'POST', url: '/runs', headers: h, payload: { track: synthRun(3, 360), forge: false },
+    })).body);
+    expect(second.records.firstRun).toBe(false);
+    expect(second.records.longestDistance).toBe(false);
+    expect(second.records.fastestPace).toBe(false);
+
+    // Longer and faster: both records again.
+    const third = JSON.parse((await app.inject({
+      method: 'POST', url: '/runs', headers: h, payload: { track: synthRun(9, 300), forge: false },
+    })).body);
+    expect(third.records.longestDistance).toBe(true);
+    expect(third.records.fastestPace).toBe(true);
+  });
+
   it('summarises weekly/monthly volume and personal bests', async () => {
     const res = await app.inject({ method: 'GET', url: '/stats/running', headers: H() });
     expect(res.statusCode).toBe(200);

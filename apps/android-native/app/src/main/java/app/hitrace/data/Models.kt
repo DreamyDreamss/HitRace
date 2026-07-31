@@ -102,7 +102,11 @@ data class TrackDto(
 data class RunBody(val track: TrackDto, val forge: Boolean = true, val name: String? = null)
 
 @Serializable
-data class ForgeResult(val sword: Sword? = null, val rewards: Rewards = Rewards())
+data class ForgeResult(
+    val sword: Sword? = null,
+    val rewards: Rewards = Rewards(),
+    val records: RunRecords = RunRecords(),
+)
 
 @Serializable
 data class Totals(
@@ -290,7 +294,32 @@ data class PersonalBests(
 )
 
 @Serializable
+data class GoalStat(
+    val weeklyGoalKm: Int = 20,
+    val daysLeftInWeek: Int = 7,
+    val remainingKm: Double = 0.0,
+    val progress: Double = 0.0,
+    val achieved: Boolean = false,
+)
+
+@Serializable
+data class GoalBody(val weeklyGoalKm: Int)
+
+/** Which personal bests a run just beat — shown once, right after the run. */
+@Serializable
+data class RunRecords(
+    val firstRun: Boolean = false,
+    val longestDistance: Boolean = false,
+    val longestDuration: Boolean = false,
+    val fastestPace: Boolean = false,
+    val biggestClimb: Boolean = false,
+) {
+    val any: Boolean get() = firstRun || longestDistance || longestDuration || fastestPace || biggestClimb
+}
+
+@Serializable
 data class RunningStats(
+    val goal: GoalStat = GoalStat(),
     val thisWeek: VolumeStat = VolumeStat(),
     val lastWeek: VolumeStat = VolumeStat(),
     val thisMonth: VolumeStat = VolumeStat(),

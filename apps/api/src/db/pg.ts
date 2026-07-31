@@ -14,6 +14,7 @@ function rowToUser(r: any): User {
     id: r.id, handle: r.handle, email: r.email ?? undefined, maxHeartRate: r.max_heart_rate,
     rankRp: r.rank_rp, equippedSwordId: r.equipped_sword_id ?? undefined, gachaPity: r.gacha_pity,
     streakDays: r.streak_days ?? 0, lastRunDay: r.last_run_day ?? undefined,
+    weeklyGoalKm: r.weekly_goal_km ?? 20,
     onboardedAt: r.onboarded_at ? new Date(r.onboarded_at).getTime() : undefined,
     createdAt: new Date(r.created_at).getTime(),
   };
@@ -47,7 +48,7 @@ export class PgRepo implements Repo {
   }
   async updateUser(id: string, patch: Partial<User>) {
     const sets: string[] = []; const vals: any[] = []; let i = 1;
-    const map: Record<string, string> = { rankRp: 'rank_rp', equippedSwordId: 'equipped_sword_id', gachaPity: 'gacha_pity', streakDays: 'streak_days', lastRunDay: 'last_run_day', onboardedAt: 'onboarded_at' };
+    const map: Record<string, string> = { rankRp: 'rank_rp', equippedSwordId: 'equipped_sword_id', gachaPity: 'gacha_pity', streakDays: 'streak_days', lastRunDay: 'last_run_day', onboardedAt: 'onboarded_at', weeklyGoalKm: 'weekly_goal_km' };
     for (const [k, v] of Object.entries(patch)) {
       const col = map[k]; if (!col) continue;
       sets.push(`${col}=$${i++}`); vals.push(k === 'onboardedAt' && v ? new Date(v as number) : v);

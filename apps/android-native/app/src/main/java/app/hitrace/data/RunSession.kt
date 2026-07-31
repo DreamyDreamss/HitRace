@@ -4,6 +4,8 @@ package app.hitrace.data
 object RunSession {
     var track: TrackDto? = null
     var forged: Sword? = null
+    /** Personal bests the just-finished run set; consumed by the forge/summary screen. */
+    var records: RunRecords = RunRecords()
 }
 
 // Keeps the in-progress workshop transform alive across Workshop → 부위 지정 → Workshop

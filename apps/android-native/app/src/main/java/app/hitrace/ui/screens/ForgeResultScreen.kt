@@ -49,6 +49,8 @@ fun ForgeResultScreen(onDone: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         Text("FORGED · ${sword.rarity}", color = c, fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 3.sp)
         Text("달린 경로가 검이 되었습니다", color = Rb.Text3, fontSize = 13.sp)
+        // Records earned by the run that made this blade — the running half of the reward.
+        RecordBadges(RunSession.records)
         Spacer(Modifier.weight(1f))
         BladeCanvas(sword.shape, sword.rarity, glow = true, modifier = Modifier.size(150.dp, 320.dp).scale(0.6f + 0.4f * reveal.value).alpha(reveal.value))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -59,6 +61,30 @@ fun ForgeResultScreen(onDone: () -> Unit) {
         StatBars(sword)
         Button(onClick = { RunSession.track = null; RunSession.forged = null; onDone() }, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) {
             Text("완료", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+    }
+}
+
+/** 🏆 badges for whatever personal bests this run beat. Silent when there are none. */
+@Composable
+private fun RecordBadges(r: app.hitrace.data.RunRecords) {
+    if (!r.any) return
+    val labels = buildList {
+        if (r.firstRun) add("첫 러닝")
+        if (r.longestDistance) add("최장 거리")
+        if (r.fastestPace) add("최고 페이스")
+        if (r.longestDuration) add("최장 시간")
+        if (r.biggestClimb) add("최대 고도")
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        labels.forEach { label ->
+            Text(
+                "🏆 $label",
+                color = Rb.Gold, fontSize = 11.sp,
+                modifier = Modifier.clip(RoundedCornerShape(999.dp))
+                    .background(Rb.Gold.copy(alpha = 0.13f))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            )
         }
     }
 }

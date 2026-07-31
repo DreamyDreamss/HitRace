@@ -13,6 +13,8 @@ export interface User {
   gachaPity: number;
   /** Consecutive-day running streak. */
   streakDays: number;
+  /** Weekly distance target in km (habit loop; 0 = no goal). */
+  weeklyGoalKm?: number;
   /** Epoch-day integer of the last run (for streak continuity). */
   lastRunDay?: number;
   onboardedAt?: number;
