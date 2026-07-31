@@ -1,7 +1,7 @@
 // Persistence boundary. Services depend on this interface, never on a concrete DB.
 // Two implementations: MemoryRepo (default, seeded) and PgRepo (Postgres).
 
-import type { Currency, GachaState, Sword, Wallet } from '@hitrace/game-core';
+import type { Currency, GachaState, GpsPoint, Sword, Wallet } from '@hitrace/game-core';
 
 export interface User {
   id: string;
@@ -33,6 +33,10 @@ export interface RunRecord {
   rejectReasons?: string[];
   startedAt: number;
   createdAt: number;
+  /** Downsampled GPS polyline kept for the run detail screen (empty for manual runs). */
+  route?: GpsPoint[];
+  /** Id of the sword this run forged, when it did. */
+  swordId?: string;
 }
 
 export interface LedgerEntry {
@@ -125,6 +129,9 @@ export interface Repo {
 
   // runs
   createRun(run: RunRecord): Promise<void>;
+  /** Newest first. Summaries only — the route comes from getRun. */
+  listRuns(userId: string, limit: number): Promise<RunRecord[]>;
+  getRun(userId: string, runId: string): Promise<RunRecord | undefined>;
   countForgesOnDay(userId: string, dayStartMs: number): Promise<number>;
   countRunsForCourse(userId: string, courseHash: string): Promise<number>;
   runStats(userId: string): Promise<RunStats>;

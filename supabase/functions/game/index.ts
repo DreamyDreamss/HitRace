@@ -80,6 +80,15 @@ Deno.serve(async (req) => {
       return json(await svc.manualRun(userId, Number(body.distanceKm), Number(body.paceSecPerKm), body.name));
     }
 
+    // ── Running log ────────────────────────────────────────────────────────
+    if (req.method === 'GET' && path === '/runs') {
+      return json(await svc.listRuns(userId, Number(url.searchParams.get('limit') ?? 50)));
+    }
+    if (req.method === 'GET' && path === '/stats/running') return json(await svc.runningStats(userId));
+    if (req.method === 'GET' && seg[0] === 'runs' && seg.length === 2) {
+      return json(await svc.runDetail(userId, seg[1]));
+    }
+
     // ── Swords ─────────────────────────────────────────────────────────────
     if (req.method === 'GET' && path === '/swords') return json(await svc.listSwords(userId));
     if (req.method === 'POST' && path === '/swords/dismantle') {

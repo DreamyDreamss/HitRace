@@ -171,6 +171,16 @@ export class MemoryRepo implements Repo {
   async createRun(run: RunRecord) {
     this.runs.push(run);
   }
+  async listRuns(userId: string, limit: number) {
+    return this.runs
+      .filter((r) => r.userId === userId && r.status !== 'rejected')
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, limit)
+      .map(({ route: _route, ...summary }) => summary);
+  }
+  async getRun(userId: string, runId: string) {
+    return this.runs.find((r) => r.id === runId && r.userId === userId);
+  }
   async countForgesOnDay(userId: string, dayStartMs: number) {
     return this.runs.filter((r) => r.userId === userId && r.status === 'forged' && r.createdAt >= dayStartMs).length;
   }

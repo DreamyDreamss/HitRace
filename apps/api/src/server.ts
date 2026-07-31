@@ -87,6 +87,20 @@ export function buildServer(opts: BuildOpts): FastifyInstance {
     } catch (e) { return handle(reply, e); }
   });
 
+  // ── Running log ──────────────────────────────────────────────────────────────
+  app.get('/runs', { preHandler: requireAuth }, async (req, reply) => {
+    try {
+      const limit = Number((req.query as any)?.limit ?? 50);
+      return await svc.listRuns(req.userId!, limit);
+    } catch (e) { return handle(reply, e); }
+  });
+  app.get('/runs/:id', { preHandler: requireAuth }, async (req, reply) => {
+    try { return await svc.runDetail(req.userId!, (req.params as any).id); } catch (e) { return handle(reply, e); }
+  });
+  app.get('/stats/running', { preHandler: requireAuth }, async (req, reply) => {
+    try { return await svc.runningStats(req.userId!); } catch (e) { return handle(reply, e); }
+  });
+
   // ── Swords ───────────────────────────────────────────────────────────────────
   app.get('/swords', { preHandler: requireAuth }, async (req, reply) => {
     try { return await svc.listSwords(req.userId!); } catch (e) { return handle(reply, e); }

@@ -16,6 +16,9 @@ import {
   runOreReward,
   runTicketReward,
   simulateCombat,
+  computeSplits,
+  bestKmPace,
+  decimate,
   fuseSwords,
   validateFusion,
   forgeManual,
@@ -58,6 +61,21 @@ function startOfWeek(ts: number): number {
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - day);
   return d.getTime();
+}
+function startOfMonth(ts: number): number {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(1);
+  return d.getTime();
+}
+function round1(v: number): number {
+  return Math.round(v * 10) / 10;
+}
+/** Distance-weighted average pace — the only average that matches a runner's expectation. */
+function avgPace(runs: Array<{ distanceKm: number; durationSec: number }>): number {
+  const km = runs.reduce((a, r) => a + r.distanceKm, 0);
+  const sec = runs.reduce((a, r) => a + r.durationSec, 0);
+  return km > 0 ? Math.round(sec / km) : 0;
 }
 
 export class ServiceError extends Error {
@@ -110,6 +128,10 @@ export class GameService {
       distanceKm: metrics.distanceKm, durationSec: Math.round(metrics.durationSec), avgPaceSecPerKm: Math.round(metrics.avgPaceSecPerKm),
       elevationGainM: Math.round(metrics.elevationGainM), forgeScore: undefined,
       startedAt: track.points[0]!.t, createdAt: now,
+      // Keep a downsampled polyline: enough to draw the route and compute splits,
+      // small enough that a year of running stays cheap to store.
+      route: decimate(track.points, 300),
+      swordId: opts.forge ? swordId : undefined,
     };
     await this.repo.createRun(rec);
 
@@ -348,6 +370,95 @@ export class GameService {
     const s = await this.repo.getSword(swordId);
     if (!s || s.ownerId !== userId) throw new ServiceError('not_found_or_not_owned', 404);
     return s;
+  }
+
+  // ── Running log ────────────────────────────────────────────────────────────
+  // The game side (swords) is only half the app; these are the numbers a runner
+  // actually comes back for.
+
+  /** Recent runs, newest first. Summaries only — no route payload. */
+  async listRuns(userId: string, limit = 50) {
+    const runs = await this.repo.listRuns(userId, Math.min(200, Math.max(1, limit)));
+    return runs.map((r) => ({
+      id: r.id,
+      status: r.status,
+      distanceKm: r.distanceKm,
+      durationSec: r.durationSec,
+      avgPaceSecPerKm: r.avgPaceSecPerKm,
+      elevationGainM: r.elevationGainM,
+      courseHash: r.courseHash,
+      swordId: r.swordId,
+      startedAt: r.startedAt,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  /** One run with its route and per-kilometre splits, plus the sword it forged. */
+  async runDetail(userId: string, runId: string) {
+    const run = await this.repo.getRun(userId, runId);
+    if (!run) throw new ServiceError('run_not_found', 404);
+    const route = run.route ?? [];
+    const splits = computeSplits(route);
+    const sword = run.swordId ? await this.repo.getSword(run.swordId) : undefined;
+    return {
+      run: {
+        id: run.id, status: run.status, distanceKm: run.distanceKm, durationSec: run.durationSec,
+        avgPaceSecPerKm: run.avgPaceSecPerKm, elevationGainM: run.elevationGainM,
+        courseHash: run.courseHash, startedAt: run.startedAt, createdAt: run.createdAt,
+      },
+      route,
+      splits,
+      bestKmPaceSecPerKm: bestKmPace(splits),
+      sword: sword && sword.ownerId === userId ? sword : undefined,
+    };
+  }
+
+  /**
+   * The running dashboard: this week vs last, a 12-week trend, and personal bests.
+   * Computed from the run log rather than stored counters so it can never drift.
+   */
+  async runningStats(userId: string, now = Date.now()) {
+    const runs = await this.repo.listRuns(userId, 200);
+    const weekStart = startOfWeek(now);
+    const lastWeekStart = weekStart - 7 * 86_400_000;
+    const monthStart = startOfMonth(now);
+
+    const sum = (rs: typeof runs) => ({
+      runs: rs.length,
+      distanceKm: round1(rs.reduce((a, r) => a + r.distanceKm, 0)),
+      durationSec: rs.reduce((a, r) => a + r.durationSec, 0),
+    });
+    const inRange = (from: number, to = Infinity) =>
+      runs.filter((r) => r.startedAt >= from && r.startedAt < to);
+
+    const thisWeek = sum(inRange(weekStart));
+    const lastWeek = sum(inRange(lastWeekStart, weekStart));
+
+    // Oldest → newest so a chart can render it left to right.
+    const weekly = Array.from({ length: 12 }, (_, i) => {
+      const from = weekStart - (11 - i) * 7 * 86_400_000;
+      const s = sum(inRange(from, from + 7 * 86_400_000));
+      return { weekStart: from, distanceKm: s.distanceKm, runs: s.runs };
+    });
+
+    const paced = runs.filter((r) => r.distanceKm >= 1 && r.avgPaceSecPerKm > 0);
+    const user = await this.repo.getUser(userId);
+    const all = sum(runs);
+
+    return {
+      thisWeek: { ...thisWeek, avgPaceSecPerKm: avgPace(inRange(weekStart)) },
+      lastWeek,
+      thisMonth: sum(inRange(monthStart)),
+      allTime: { ...all, avgPaceSecPerKm: avgPace(runs) },
+      weekly,
+      personalBests: {
+        longestKm: runs.length ? round1(Math.max(...runs.map((r) => r.distanceKm))) : 0,
+        longestDurationSec: runs.length ? Math.max(...runs.map((r) => r.durationSec)) : 0,
+        fastestPaceSecPerKm: paced.length ? Math.min(...paced.map((r) => r.avgPaceSecPerKm)) : 0,
+        biggestClimbM: runs.length ? Math.max(...runs.map((r) => r.elevationGainM)) : 0,
+        longestStreakDays: user?.streakDays ?? 0,
+      },
+    };
   }
 
   /** Dashboard payload. Lives here so the Fastify server and the Edge Function agree. */

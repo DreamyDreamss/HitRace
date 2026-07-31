@@ -5,7 +5,14 @@ import { MemoryRepo, DEMO_USER_ID } from '../db/memory.js';
 import { buildServer } from '../server.js';
 
 // Minimal synthetic run generator (Seoul, ~configurable).
-function synthRun(distanceKm = 5, paceSecPerKm = 330, shape: 'line' | 'out_and_back' = 'line'): RunTrack {
+// Anchored near "now" on purpose: the running stats bucket by when the run *started*,
+// so a track dated 2023 would never land in "this week".
+function synthRun(
+  distanceKm = 5,
+  paceSecPerKm = 330,
+  shape: 'line' | 'out_and_back' = 'line',
+  startedAt = Date.now() - 2 * 60 * 60 * 1000,
+): RunTrack {
   const base = { lat: 37.5285, lng: 126.9327 };
   const n = Math.max(20, Math.round(distanceKm * 40));
   const totalM = distanceKm * 1000;
@@ -17,7 +24,7 @@ function synthRun(distanceKm = 5, paceSecPerKm = 330, shape: 'line' | 'out_and_b
     const span = shape === 'out_and_back' ? totalM / 2 : totalM;
     const g = shape === 'out_and_back' ? (f < 0.5 ? f * 2 : (1 - f) * 2) : f;
     const dx = g * span;
-    points.push({ lat: base.lat, lng: base.lng + dx / (111320 * Math.cos((base.lat * Math.PI) / 180)), ele: 20 + Math.sin(f * Math.PI) * 40, t: 1_700_000_000_000 + Math.round(f * totalSec * 1000) });
+    points.push({ lat: base.lat, lng: base.lng + dx / (111320 * Math.cos((base.lat * Math.PI) / 180)), ele: 20 + Math.sin(f * Math.PI) * 40, t: startedAt + Math.round(f * totalSec * 1000) });
     cadence.push(170 + Math.sin(i) * 2);
   }
   return { points, cadence, heartRate: points.map((_, i) => (i / n < 0.6 ? 152 : 95)), maxHeartRate: 190 };
@@ -99,6 +106,56 @@ describe('runs → forge', () => {
     expect(r2.statusCode).toBe(200);
     const r3 = await app.inject({ method: 'POST', url: '/runs', headers: H(), payload: { track: synthRun(5, 320), forge: true } });
     expect(r3.statusCode).toBe(429);
+  });
+});
+
+describe('running log', () => {
+  it('lists past runs newest first, without the route payload', async () => {
+    const res = await app.inject({ method: 'GET', url: '/runs', headers: H() });
+    expect(res.statusCode).toBe(200);
+    const runs = JSON.parse(res.body);
+    expect(runs.length).toBeGreaterThanOrEqual(2); // forged in the block above
+    expect(runs[0].createdAt).toBeGreaterThanOrEqual(runs[1].createdAt);
+    expect(runs[0].distanceKm).toBeGreaterThan(0);
+    expect(runs[0].route).toBeUndefined();
+  });
+
+  it('returns route + per-km splits + the forged sword for one run', async () => {
+    const list = JSON.parse((await app.inject({ method: 'GET', url: '/runs', headers: H() })).body);
+    const forged = list.find((r: any) => r.swordId);
+    expect(forged).toBeTruthy();
+
+    const res = await app.inject({ method: 'GET', url: `/runs/${forged.id}`, headers: H() });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.route.length).toBeGreaterThan(1);
+    expect(body.splits.length).toBeGreaterThanOrEqual(Math.floor(forged.distanceKm));
+    expect(body.splits[0].km).toBe(1);
+    expect(body.bestKmPaceSecPerKm).toBeGreaterThan(0);
+    expect(body.sword.id).toBe(forged.swordId);
+  });
+
+  it('404s a run that belongs to someone else', async () => {
+    const other = await app.inject({ method: 'POST', url: '/auth/dev/login', payload: { handle: 'nosy' } });
+    const otherToken = JSON.parse(other.body).token;
+    const list = JSON.parse((await app.inject({ method: 'GET', url: '/runs', headers: H() })).body);
+    const res = await app.inject({
+      method: 'GET', url: `/runs/${list[0].id}`, headers: { authorization: `Bearer ${otherToken}` },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('summarises weekly/monthly volume and personal bests', async () => {
+    const res = await app.inject({ method: 'GET', url: '/stats/running', headers: H() });
+    expect(res.statusCode).toBe(200);
+    const s = JSON.parse(res.body);
+    expect(s.thisWeek.runs).toBeGreaterThanOrEqual(2);
+    expect(s.thisWeek.distanceKm).toBeGreaterThan(0);
+    expect(s.thisWeek.avgPaceSecPerKm).toBeGreaterThan(0);
+    expect(s.weekly).toHaveLength(12);
+    expect(s.weekly[11].distanceKm).toBeCloseTo(s.thisWeek.distanceKm, 1); // last bucket = this week
+    expect(s.personalBests.longestKm).toBeGreaterThanOrEqual(6);
+    expect(s.personalBests.fastestPaceSecPerKm).toBeGreaterThan(0);
   });
 });
 

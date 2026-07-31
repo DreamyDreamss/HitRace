@@ -89,11 +89,45 @@ export class PgRepo implements Repo {
   }
 
   async createRun(run: RunRecord) {
+    // The route is kept (downsampled by the service) so the run-detail screen can draw it.
     await this.q(
       `INSERT INTO runs (id,user_id,status,track,course_hash,repeat_index,distance_km,duration_sec,avg_pace_sec_km,elevation_gain_m,avg_cadence,forge_score,reject_reasons,started_at)
-       VALUES ($1,$2,$3,'{}'::jsonb,$4,$5,$6,$7,$8,$9,0,$10,$11,$12)`,
-      [run.id, run.userId, run.status, run.courseHash, run.repeatIndex, run.distanceKm, run.durationSec, run.avgPaceSecPerKm, run.elevationGainM, run.forgeScore ?? null, run.rejectReasons ?? null, new Date(run.startedAt)],
+       VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,0,$11,$12,$13)`,
+      [
+        run.id, run.userId, run.status,
+        JSON.stringify({ points: run.route ?? [], swordId: run.swordId ?? null }),
+        run.courseHash, run.repeatIndex, run.distanceKm, run.durationSec, run.avgPaceSecPerKm,
+        run.elevationGainM, run.forgeScore ?? null, run.rejectReasons ?? null, new Date(run.startedAt),
+      ],
     );
+  }
+
+  private rowToRun(r: any): RunRecord {
+    return {
+      id: r.id, userId: r.user_id, status: r.status, courseHash: r.course_hash,
+      repeatIndex: r.repeat_index, distanceKm: Number(r.distance_km), durationSec: r.duration_sec,
+      avgPaceSecPerKm: r.avg_pace_sec_km, elevationGainM: r.elevation_gain_m,
+      forgeScore: r.forge_score ?? undefined, rejectReasons: r.reject_reasons ?? undefined,
+      startedAt: new Date(r.started_at).getTime(), createdAt: new Date(r.created_at).getTime(),
+      route: r.track?.points ?? undefined, swordId: r.track?.swordId ?? undefined,
+    };
+  }
+
+  async listRuns(userId: string, limit: number) {
+    const r = await this.q(
+      `SELECT id,user_id,status,course_hash,repeat_index,distance_km,duration_sec,avg_pace_sec_km,
+              elevation_gain_m,forge_score,reject_reasons,started_at,created_at,
+              jsonb_build_object('swordId', track->'swordId') AS track
+         FROM runs WHERE user_id=$1 AND status<>'rejected'
+        ORDER BY created_at DESC LIMIT $2`,
+      [userId, limit],
+    );
+    return r.rows.map((row: any) => this.rowToRun(row));
+  }
+
+  async getRun(userId: string, runId: string) {
+    const r = await this.q('SELECT * FROM runs WHERE id=$1 AND user_id=$2', [runId, userId]);
+    return r.rows[0] ? this.rowToRun(r.rows[0]) : undefined;
   }
   async countForgesOnDay(userId: string, dayStartMs: number) {
     const r = await this.q(`SELECT count(*)::int AS c FROM runs WHERE user_id=$1 AND status='forged' AND created_at>=$2`, [userId, new Date(dayStartMs)]);

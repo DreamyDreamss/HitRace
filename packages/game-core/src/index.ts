@@ -16,6 +16,8 @@ export {
   computeCP,
   fingerprint,
 } from './conversion.js';
+export { computeSplits, bestKmPace } from './splits.js';
+export type { Split } from './splits.js';
 export { forgeSword } from './forge.js';
 export type { ForgeContext, ForgeOutcome } from './forge.js';
 export {
