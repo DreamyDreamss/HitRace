@@ -1,3 +1,4 @@
+import type { BossRepo } from './boss-repo.js';
 // Persistence boundary. Services depend on this interface, never on a concrete DB.
 // Two implementations: MemoryRepo (default, seeded) and PgRepo (Postgres).
 
@@ -111,6 +112,13 @@ export interface CodexEntry {
 }
 
 export interface Repo {
+  /**
+   * 동네 보스 storage, when the backing store can do point-in-polygon (Postgres + PostGIS).
+   * Absent on the in-memory repo, and every caller treats that as "this deployment has no
+   * bosses" rather than as an error.
+   */
+  boss?: BossRepo;
+
   // users
   getUser(id: string): Promise<User | undefined>;
   getUserByHandle(handle: string): Promise<User | undefined>;

@@ -159,6 +159,17 @@ describe('runs → forge', () => {
     expect(JSON.parse((await app.inject({ method: 'GET', url: '/swords', headers: h })).body)).toHaveLength(1);
   });
 
+  it('equips the first sword automatically', async () => {
+    // Otherwise a new runner owns a blade, cannot enter PvP ("no_equipped_sword"), and deals
+    // half damage to their neighbourhood boss — all for not having found the equip button.
+    const login = await app.inject({ method: 'POST', url: '/auth/dev/login', payload: { handle: 'firstblade' } });
+    const h = { authorization: `Bearer ${JSON.parse(login.body).token}` };
+    const res = await app.inject({ method: 'POST', url: '/runs', headers: h, payload: { track: synthRun(5, 330), forge: true } });
+    const sword = JSON.parse(res.body).sword;
+    const me = JSON.parse((await app.inject({ method: 'GET', url: '/me', headers: h })).body);
+    expect(me.equipped?.id).toBe(sword.id);
+  });
+
   it('forges a sword from a valid run and grants ore + ticket', async () => {
     const walletBefore = JSON.parse((await app.inject({ method: 'GET', url: '/wallet', headers: H() })).body);
     const res = await app.inject({ method: 'POST', url: '/runs', headers: H(), payload: { track: synthRun(8, 300, 'out_and_back'), forge: true } });

@@ -4,6 +4,7 @@
 import pg from 'pg';
 import type { Currency, GachaState, Sword, Wallet } from '@hitrace/game-core';
 import type { CodexEntry, CourseScore, Ghost, LedgerEntry, MatchRecord, Repo, RunRecord, RunStats, SeasonPass, User } from './repo.js';
+import { PgBossRepo } from './pg-boss.js';
 
 const KM_PER_PASS_LEVEL = 12;
 
@@ -31,9 +32,12 @@ function rowToSword(r: any): Sword {
 
 export class PgRepo implements Repo {
   private pool: pg.Pool;
+  /** 동네 보스 storage. Only Postgres has it — the feature needs PostGIS. */
+  readonly boss: PgBossRepo;
   constructor(connectionString: string) {
     this.pool = new Pool({ connectionString });
     this.pool.on('connect', (c) => { void c.query('SET search_path TO hitrace, public'); });
+    this.boss = new PgBossRepo((text, params) => this.q(text, params));
   }
   async close() { await this.pool.end(); }
   private q<T extends pg.QueryResultRow = any>(text: string, params: any[] = []) { return this.pool.query<T>(text, params); }
@@ -59,7 +63,7 @@ export class PgRepo implements Repo {
 
   async getWallet(userId: string): Promise<Wallet> {
     const r = await this.q('SELECT currency, balance FROM wallets WHERE user_id=$1', [userId]);
-    const w: Wallet = { ore: 0, engraveStone: 0, forgeTicket: 0 };
+    const w: Wallet = { ore: 0, engraveStone: 0, forgeTicket: 0, manaStone: 0 };
     for (const row of r.rows) (w as any)[row.currency] = row.balance;
     return w;
   }

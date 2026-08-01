@@ -40,6 +40,8 @@ import {
 } from '@hitrace/game-core';
 import { randomUUID } from 'node:crypto';
 import type { LedgerEntry, MatchRecord, Repo, RunRecord } from './db/repo.js';
+import { BossService } from './boss-service.js';
+import type { BossOutcome } from './boss-service.js';
 
 // Entity ids must be valid UUIDs — the Postgres schema uses uuid PKs. (The
 // in-memory repo accepts any string, so this only surfaces against a real DB.)
@@ -197,6 +199,10 @@ export class GameService {
 
     if (opts.forge) {
       await this.repo.addSword(sword);
+      // Your first blade equips itself. There is nothing to choose between when you own one, and
+      // leaving it unequipped silently locks a new runner out of PvP and halves the damage they
+      // deal to their neighbourhood boss — a punishment for not having found a button yet.
+      if (!user.equippedSwordId) await this.repo.updateUser(userId, { equippedSwordId: sword.id });
       await this.repo.recordCodex(userId, sword); // permanent course record (survives dismantle)
       const score = computeForgeScore(metrics, { repeatIndex: priorRepeats, isNewCourse: priorRepeats === 0 });
       await this.repo.recordCourseScore({ courseHash, userId, handle: user.handle, bestScore: score.total, bestCp: sword.cp, at: now });
@@ -206,6 +212,16 @@ export class GameService {
       ? undefined
       : await this.grantWeeklyGoalBonus(userId, metrics.distanceKm, now);
 
+    // 동네 보스: running *is* the attack. Never allowed to fail the run — a boss layer that can
+    // lose somebody's 10 km is worse than no boss layer.
+    let boss: BossOutcome | undefined;
+    if (!tooShortToForge) {
+      boss = await this.applyBossDamage(userId, runId, metrics, now).catch((e) => {
+        console.warn('boss damage skipped:', (e as Error).message);
+        return undefined;
+      });
+    }
+
     return {
       run: rec,
       sword: opts.forge ? sword : undefined,
@@ -213,9 +229,63 @@ export class GameService {
       rewards,
       records,
       weeklyGoal,
+      boss,
       // Told plainly so the client can say "저장했지만 보상은 없습니다" instead of implying a payout.
       belowThreshold: tooShortToForge ? belowThreshold : undefined,
     };
+  }
+
+  /** The boss service, or undefined on a deployment whose store cannot do geography. */
+  private bossService(): BossService | undefined {
+    if (!this.repo.boss) return undefined;
+    this.boss ??= new BossService(this.repo.boss);
+    return this.boss;
+  }
+  private boss?: BossService;
+
+  private async applyBossDamage(
+    userId: string,
+    runId: string,
+    metrics: { avgPaceSecPerKm: number; elevationGainM: number },
+    now: number,
+  ): Promise<BossOutcome | undefined> {
+    const service = this.bossService();
+    if (!service) return undefined;
+    const user = await this.repo.getUser(userId);
+    const equipped = user?.equippedSwordId ? await this.repo.getSword(user.equippedSwordId) : undefined;
+    return service.applyRun({
+      runId,
+      userId,
+      paceSecPerKm: metrics.avgPaceSecPerKm,
+      elevationGainM: metrics.elevationGainM,
+      equippedCp: equipped?.cp,
+      streakDays: user?.streakDays,
+      at: now,
+    });
+  }
+
+  /** What the 동네 보스 screen renders. */
+  async bossStatus(userId: string, lat: number, lng: number, level: 'dong' | 'gu' = 'dong') {
+    const service = this.bossService();
+    if (!service || !this.repo.boss) throw new ServiceError('boss_unavailable', 503);
+    const region = await this.repo.boss.regionAt(lat, lng, level);
+    // Outside the boundary data there is simply nothing here — not an error, just no boss.
+    if (!region) return { region: null, boss: null, leaderboard: [] };
+    return service.status(region.code, level, Date.now());
+  }
+
+  async awakenSword(userId: string, swordId: string) {
+    const service = this.bossService();
+    if (!service) throw new ServiceError('boss_unavailable', 503);
+    const sword = await this.repo.getSword(swordId);
+    if (!sword || sword.ownerId !== userId) throw new ServiceError('not_your_sword', 404);
+    const wallet = await this.repo.getWallet(userId);
+    const result = await service.awaken(userId, swordId, wallet.ore);
+    if (!result.ok) throw new ServiceError(result.reason, 400);
+    await this.repo.applyCurrency({
+      userId, currency: 'ore', delta: -result.cost.ore, reason: 'awaken', refId: swordId, createdAt: Date.now(),
+    });
+    return { stage: result.stage, cost: result.cost };
   }
 
   // ── Manual / treadmill forge (no GPS) ──────────────────────────────────────
@@ -245,6 +315,7 @@ export class GameService {
     const records = await this.detectRecords(userId, rec);
     await this.repo.createRun(rec);
     await this.repo.addSword(sword);
+    if (!user.equippedSwordId) await this.repo.updateUser(userId, { equippedSwordId: sword.id });
     // Note: procedural blades are intentionally NOT recorded in the codex (kept for real GPS routes).
 
     // Ore reward, but no forge ticket (tickets stay a GPS incentive).

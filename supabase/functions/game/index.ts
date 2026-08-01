@@ -84,6 +84,20 @@ Deno.serve(async (req) => {
     if (req.method === 'GET' && path === '/runs') {
       return json(await svc.listRuns(userId, Number(url.searchParams.get('limit') ?? 50)));
     }
+    // ── 동네 보스 ──────────────────────────────────────────────────────────
+    // Location comes in as a query param rather than being stored: this is "what is the boss
+    // where I am standing right now", and the answer should not require having run there yet.
+    if (req.method === 'GET' && path === '/boss') {
+      const lat = Number(url.searchParams.get('lat'));
+      const lng = Number(url.searchParams.get('lng'));
+      const level = url.searchParams.get('level') === 'gu' ? 'gu' : 'dong';
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return json({ error: 'missing_location' }, 400);
+      return json(await svc.bossStatus(userId, lat, lng, level));
+    }
+    if (req.method === 'POST' && seg[0] === 'swords' && seg[2] === 'awaken') {
+      return json(await svc.awakenSword(userId, seg[1]!));
+    }
+
     if (req.method === 'GET' && path === '/stats/running') return json(await svc.runningStats(userId));
     if (req.method === 'POST' && path === '/stats/goal') {
       return json(await svc.setWeeklyGoal(userId, Number(body.weeklyGoalKm)));

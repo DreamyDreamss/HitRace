@@ -11,7 +11,7 @@ const RARITY_RANK: Record<string, number> = { N: 0, R: 1, SR: 2, LEGEND: 3 };
 export const DEMO_USER_ID = '11111111-1111-1111-1111-111111111111';
 
 function emptyWallet(): Wallet {
-  return { ore: 0, engraveStone: 0, forgeTicket: 0 };
+  return { ore: 0, engraveStone: 0, forgeTicket: 0, manaStone: 0 };
 }
 
 export class MemoryRepo implements Repo {
@@ -48,7 +48,7 @@ export class MemoryRepo implements Repo {
       onboardedAt: now,
       createdAt: now,
     });
-    this.wallets.set(DEMO_USER_ID, { ore: 1240, engraveStone: 3, forgeTicket: 11 });
+    this.wallets.set(DEMO_USER_ID, { ore: 1240, engraveStone: 3, forgeTicket: 11, manaStone: 0 });
     this.gacha.set(DEMO_USER_ID, { pityCounter: 37 });
 
     const mkSword = (
