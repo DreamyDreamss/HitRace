@@ -50,6 +50,7 @@ Supabase에 `postgis` 확장이 사용 가능한 것을 확인했습니다.
 create table hitrace.regions (
   code        text primary key,          -- '1144063' (행정동) / '11440' (시군구)
   name        text not null,             -- '연남동' / '마포구'
+  sido        text,                      -- '서울특별시' — 중구·동구는 여러 시도에 존재
   level       text not null,             -- 'dong' | 'gu'
   parent_code text references hitrace.regions(code),
   geom        geometry(MultiPolygon, 4326) not null,
@@ -286,6 +287,30 @@ tools/seed-regions.mjs   GeoJSON → PostGIS 적재 (1회성)
 B1~B4가 "동네 보스가 돈다"의 최소 형태입니다. B5부터가 장기 동기입니다.
 
 ---
+
+## 진행 상황
+
+**B1 완료 (2026-08-01)** — PostGIS 3.3 활성화, `hitrace.regions` 적재 완료:
+행정동 **3,482** · 시군구 **230** · 상위 구를 못 찾은 동 **0개**.
+행정동 코드 앞 4자리가 곧 시군구 코드라서 계층이 공짜로 나왔습니다(공간 조인 불필요).
+
+좌표 → 지역 판정 검증:
+
+| 좌표 | 동 | 구 |
+|---|---|---|
+| 홍대입구역 | 서교동 | 서울특별시 마포구 |
+| 여의도공원 | 여의동 | 서울특별시 영등포구 |
+| 강남역 | 서초4동 | 서울특별시 서초구 |
+| 경복궁 | 청운효자동 | 서울특별시 종로구 |
+| 해운대해수욕장 | 우1동 | 부산광역시 해운대구 |
+| 제주시청 | 이도1동 | 제주특별자치도 제주시 |
+| 대전 시청 | 둔산2동 | 대전광역시 서구 |
+| 도쿄 시부야 | — | — (설계대로 보스 없음) |
+
+적재 도구는 `tools/seed-regions.mjs`(멱등 — 경계 개편 시 그대로 재실행).
+원본 GeoJSON은 2.5MB라 저장소에 넣지 않고 도구가 경로를 인자로 받습니다.
+
+다음: **B2** `game-core/boss` 엔진(데미지·HP·이름·보상 분배, 순수 함수 + 테스트).
 
 ## 8. 위험
 
