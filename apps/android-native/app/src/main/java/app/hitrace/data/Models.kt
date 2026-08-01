@@ -23,6 +23,10 @@ data class BladeTransform(
 @Serializable
 data class BladeParts(val blade: Double = 0.58, val guard: Double = 0.20, val handle: Double = 0.22)
 
+/** A point on the blade's spine, in the engine's normalised [0,1]² route space. */
+@Serializable
+data class Pt(val x: Double, val y: Double)
+
 @Serializable
 data class Shape(
     val style: String = "straight",
@@ -31,6 +35,13 @@ data class Shape(
     val lengthScale: Double = 0.5,
     val transform: BladeTransform? = null,
     val parts: BladeParts? = null,
+    /**
+     * The run's own path, normalised. The server has always sent this; the app used to drop it
+     * and draw a generic leaf, which is why every sword looked the same. It is the blade's spine.
+     */
+    val centerline: List<Pt> = emptyList(),
+    /** Self-intersections of the route → rune positions along the blade. */
+    val runeAnchors: List<Pt> = emptyList(),
 )
 
 @Serializable

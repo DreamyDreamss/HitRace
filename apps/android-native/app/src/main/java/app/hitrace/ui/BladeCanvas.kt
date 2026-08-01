@@ -37,19 +37,56 @@ fun BladeCanvas(shape: Shape, rarity: String, modifier: Modifier = Modifier, glo
         val span = h * 0.92f - bladeTop
         val bladeEnd = (0.762f + (bladeFrac - 0.58f) * 0.5f).coerceIn(0.55f, 0.88f)
         val bladeBottom = bladeTop + span * bladeEnd
-        val bladeW = w * 0.30f
+        // Thickness follows the blade's own length, not the canvas width — otherwise the same
+        // sword renders as a dagger in a tall cell and a cleaver in a wide one.
+        val bladeLen = bladeBottom - bladeTop
+        val bladeW = minOf(w * 0.26f, bladeLen * 0.115f)
         val doubleEdge = shape.trueDoubleEdge
         val edge = if (doubleEdge) bladeW * 1.05f else bladeW
 
-        // blade silhouette (leaf) for straight/double; simple curve for curved/chakram handled as leaf too
-        val blade = Path().apply {
-            moveTo(cx, bladeTop)
-            lineTo(cx + edge, bladeTop + h * 0.20f)
-            lineTo(cx + edge * 0.55f, bladeBottom)
-            lineTo(cx - edge * 0.55f, bladeBottom)
-            lineTo(cx - edge, bladeTop + h * 0.20f)
-            close()
+        // The blade is the route. The spine follows the path that was actually run — start at the
+        // grip, finish at the tip — and the two edges are that spine offset by a tapering width.
+        // A route the engine couldn't turn into a spine (too few points, an old procedural
+        // treadmill blade) falls back to the generic leaf.
+        // The spine may wander as far as the canvas allows once the blade's own thickness is
+        // accounted for, so a curving route isn't clipped at the edges.
+        val geom = BladeSpine.build(shape.centerline, cx, bladeTop, bladeBottom, w / 2f - edge)
+        val spine = geom?.out
+        // The return leg shapes the far edge when the run doubled back; otherwise both edges
+        // come off the same spine.
+        val farEdge = geom?.back ?: spine
+        val blade = if (spine == null || farEdge == null) {
+            Path().apply {
+                moveTo(cx, bladeTop)
+                lineTo(cx + edge, bladeTop + h * 0.20f)
+                lineTo(cx + edge * 0.55f, bladeBottom)
+                lineTo(cx - edge * 0.55f, bladeBottom)
+                lineTo(cx - edge, bladeTop + h * 0.20f)
+                close()
+            }
+        } else {
+            Path().apply {
+                // Up one edge…
+                spine.forEachIndexed { i, p ->
+                    val t = i.toFloat() / (spine.size - 1)
+                    val n = BladeSpine.normalAt(spine, i)
+                    val hw = BladeSpine.halfWidth(t, edge)
+                    val x = p.x + n.x * hw
+                    val y = p.y + n.y * hw
+                    if (i == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                // …and back down the other.
+                for (i in farEdge.indices.reversed()) {
+                    val t = i.toFloat() / (farEdge.size - 1)
+                    val n = BladeSpine.normalAt(farEdge, i)
+                    val hw = BladeSpine.halfWidth(t, edge)
+                    lineTo(farEdge[i].x - n.x * hw, farEdge[i].y - n.y * hw)
+                }
+                close()
+            }
         }
+        val tip = spine?.lastOrNull() ?: Offset(cx, bladeTop)
+        val heel = spine?.firstOrNull() ?: Offset(cx, bladeBottom)
 
         if (glow) {
             drawPath(blade, color = c.copy(alpha = 0.28f), style = Stroke(width = 14f))
@@ -58,41 +95,46 @@ fun BladeCanvas(shape: Shape, rarity: String, modifier: Modifier = Modifier, glo
             blade,
             brush = Brush.verticalGradient(
                 colors = listOf(Rb.GoldHi, c, Color(0xFF8B6314)),
-                startY = bladeTop, endY = bladeBottom,
+                startY = tip.y, endY = bladeBottom,
             ),
         )
         drawPath(blade, color = c, style = Stroke(width = 2f))
 
         // Mirror-symmetry preview: a ghosted double-edge outline over the blade.
         if (t?.mirror == true) {
-            scale(scaleX = -1f, scaleY = 1f, pivot = Offset(cx, bladeBottom)) {
+            scale(scaleX = -1f, scaleY = 1f, pivot = Offset(heel.x, bladeBottom)) {
                 drawPath(blade, color = Rb.Purple.copy(alpha = 0.5f), style = Stroke(width = 3f))
             }
         }
 
-        // grain (run trace)
+        // Grain — literally the route, drawn down the middle of the steel.
         val grain = Path().apply {
-            moveTo(cx, bladeTop)
-            cubicTo(cx + 8f, (bladeTop + bladeBottom) * 0.4f, cx - 8f, (bladeTop + bladeBottom) * 0.6f, cx, bladeBottom)
+            if (spine == null) {
+                moveTo(cx, bladeTop)
+                cubicTo(cx + 8f, (bladeTop + bladeBottom) * 0.4f, cx - 8f, (bladeTop + bladeBottom) * 0.6f, cx, bladeBottom)
+            } else {
+                spine.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+            }
         }
         drawPath(grain, color = Rb.GoldHi.copy(alpha = 0.55f), style = Stroke(width = 3f))
 
-        // guard
+        // Guard and handle hang off the heel — where the run started — so a route that finishes
+        // off to one side still has its hilt attached to the blade.
+        val hiltX = heel.x
         drawRoundRect(
             color = Rb.Blue,
-            topLeft = Offset(cx - bladeW * 1.15f, bladeBottom),
+            topLeft = Offset(hiltX - bladeW * 1.15f, bladeBottom),
             size = androidx.compose.ui.geometry.Size(bladeW * 2.3f, h * 0.035f),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f),
         )
-        // handle
         drawRoundRect(
             color = Rb.Surface4,
-            topLeft = Offset(cx - 7f, bladeBottom + h * 0.035f),
+            topLeft = Offset(hiltX - 7f, bladeBottom + h * 0.035f),
             size = androidx.compose.ui.geometry.Size(14f, h * 0.16f),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(7f, 7f),
         )
         // pommel + tip
-        drawCircle(Color(0xFF4A5260), radius = 9f, center = Offset(cx, bladeBottom + h * 0.20f))
-        drawCircle(Rb.GoldHi, radius = 6f, center = Offset(cx, bladeTop))
+        drawCircle(Color(0xFF4A5260), radius = 9f, center = Offset(hiltX, bladeBottom + h * 0.20f))
+        drawCircle(Rb.GoldHi, radius = 6f, center = tip)
     }
 }
