@@ -68,6 +68,12 @@ export interface BossRepo {
   ): Promise<{ hp: number; maxHp: number; participants: number; killed: boolean; firstHit: boolean }>;
 
   contributions(bossId: string): Promise<ContributionRow[]>;
+  /**
+   * The region this runner has put the most distance into recently — their 동네, inferred from
+   * where they actually run. Lets the boss screen open without asking for location again.
+   */
+  homeRegion(userId: string, level: 'dong' | 'gu', sinceMs: number): Promise<RegionRow | undefined>;
+
   /** Damaging runs this user has already had counted against this region today. */
   damagingRunsToday(userId: string, regionCode: string, dayStartMs: number): Promise<number>;
 

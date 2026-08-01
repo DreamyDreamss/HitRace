@@ -170,6 +170,21 @@ export class PgBossRepo implements BossRepo {
     }));
   }
 
+  async homeRegion(userId: string, level: 'dong' | 'gu', sinceMs: number) {
+    const r = await this.q(
+      `SELECT g.code, g.name, g.sido, g.level, g.parent_code
+         FROM run_regions rr
+         JOIN runs r ON r.id = rr.run_id
+         JOIN regions g ON g.code = rr.region_code
+        WHERE r.user_id=$1 AND rr.level=$2 AND r.created_at >= $3
+        GROUP BY g.code, g.name, g.sido, g.level, g.parent_code
+        ORDER BY SUM(rr.distance_km) DESC
+        LIMIT 1`,
+      [userId, level, new Date(sinceMs)],
+    );
+    return r.rows[0] ? toRegion(r.rows[0]) : undefined;
+  }
+
   async damagingRunsToday(userId: string, regionCode: string, dayStartMs: number) {
     const r = await this.q(
       `SELECT COUNT(*)::int AS n

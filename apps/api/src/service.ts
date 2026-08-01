@@ -264,12 +264,21 @@ export class GameService {
     });
   }
 
-  /** What the 동네 보스 screen renders. */
-  async bossStatus(userId: string, lat: number, lng: number, level: 'dong' | 'gu' = 'dong') {
+  /**
+   * What the 동네 보스 screen renders.
+   *
+   * Coordinates are optional. Without them the runner's 동네 is inferred from where they have
+   * actually been running, so opening the screen does not demand a location permission the app
+   * only otherwise needs while recording.
+   */
+  async bossStatus(userId: string, level: 'dong' | 'gu' = 'dong', at?: { lat: number; lng: number }) {
     const service = this.bossService();
     if (!service || !this.repo.boss) throw new ServiceError('boss_unavailable', 503);
-    const region = await this.repo.boss.regionAt(lat, lng, level);
-    // Outside the boundary data there is simply nothing here — not an error, just no boss.
+    const region = at
+      ? await this.repo.boss.regionAt(at.lat, at.lng, level)
+      : await this.repo.boss.homeRegion(userId, level, Date.now() - 60 * 86_400_000);
+    // Outside the boundary data — or nowhere run yet — there is simply nothing here. Not an
+    // error, just no boss.
     if (!region) return { region: null, boss: null, leaderboard: [] };
     return service.status(region.code, level, Date.now());
   }

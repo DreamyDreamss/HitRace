@@ -88,11 +88,15 @@ Deno.serve(async (req) => {
     // Location comes in as a query param rather than being stored: this is "what is the boss
     // where I am standing right now", and the answer should not require having run there yet.
     if (req.method === 'GET' && path === '/boss') {
-      const lat = Number(url.searchParams.get('lat'));
-      const lng = Number(url.searchParams.get('lng'));
+      // Read the raw params first: Number(null) is 0, not NaN, so an absent coordinate would
+      // otherwise be read as lat 0 / lng 0 — the Gulf of Guinea, where nobody has a 동네.
+      const rawLat = url.searchParams.get('lat');
+      const rawLng = url.searchParams.get('lng');
+      const lat = rawLat === null ? NaN : Number(rawLat);
+      const lng = rawLng === null ? NaN : Number(rawLng);
       const level = url.searchParams.get('level') === 'gu' ? 'gu' : 'dong';
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return json({ error: 'missing_location' }, 400);
-      return json(await svc.bossStatus(userId, lat, lng, level));
+      const at = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
+      return json(await svc.bossStatus(userId, level, at));
     }
     if (req.method === 'POST' && seg[0] === 'swords' && seg[2] === 'awaken') {
       return json(await svc.awakenSword(userId, seg[1]!));

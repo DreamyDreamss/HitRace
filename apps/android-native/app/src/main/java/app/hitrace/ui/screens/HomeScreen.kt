@@ -36,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hitrace.AppViewModel
 import app.hitrace.data.ActiveRunStore
+import androidx.compose.foundation.layout.Box
+import app.hitrace.data.ApiClient
+import app.hitrace.ui.rememberLoad
 import app.hitrace.data.MeResp
 import app.hitrace.data.RunMath
 import app.hitrace.data.RunSession
@@ -43,6 +46,7 @@ import app.hitrace.data.Sword
 import app.hitrace.data.TrackDto
 import app.hitrace.data.tierLabel
 import app.hitrace.ui.BladeCanvas
+import app.hitrace.ui.BossCanvas
 import app.hitrace.ui.theme.Rb
 
 @Composable
@@ -55,6 +59,8 @@ fun HomeScreen(
     onHistory: () -> Unit = {},
     onRun: (String) -> Unit = {},
     onRecovered: () -> Unit = {},
+    onBoss: () -> Unit = {},
+    onRaid: () -> Unit = {},
 ) {
     val ranking by vm.ranking.collectAsState()
     // This is a running app first: the week's volume belongs above the fold.
@@ -79,6 +85,9 @@ fun HomeScreen(
         // Two ways a run can be stranded, both worth saying out loud before anything else on
         // this screen: the app died mid-run, or the run finished with no connection.
         RecoveryNotices(vm, onResume = onRecovered)
+
+        // 동네 보스 — above the running card, because it is the reason to go out today.
+        BossCard(onBoss, onRaid)
 
         // 이번 주 러닝 — tap to open the full stats.
         Card {
@@ -347,6 +356,48 @@ private fun RecoveryNotices(vm: AppViewModel, onResume: () -> Unit) {
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * The neighbourhood boss, on the home screen because it is the answer to "why go out today".
+ * Silent until the runner has run somewhere with a boss — an empty box would just be noise.
+ */
+@Composable
+private fun BossCard(onBoss: () -> Unit, onRaid: () -> Unit) {
+    val status = rememberLoad { ApiClient.api.boss("dong") }
+    val boss = status?.boss ?: return
+    val region = status.region ?: return
+
+    Card {
+        Column(
+            Modifier.fillMaxWidth().clickable(onClick = onBoss).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("동네 보스", color = Rb.Text3, fontSize = 12.sp)
+                Spacer(Modifier.weight(1f))
+                Text("${boss.tier}단계 ›", color = Rb.Gold, fontSize = 12.sp)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BossCanvas(boss.seed, boss.tier, Modifier.size(52.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(boss.name, color = Rb.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Rb.Surface4)) {
+                        Box(
+                            Modifier.fillMaxWidth(boss.hpFraction).height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)).background(Rb.Red),
+                        )
+                    }
+                    Text(
+                        "HP ${(boss.hpFraction * 100).toInt()}% · ${region.name} · 참가 ${boss.participants}명",
+                        color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 10.5.sp,
+                    )
+                }
+            }
+            LinkText("구 레이드 보기 →", onClick = onRaid, fontSize = 12.sp)
         }
     }
 }

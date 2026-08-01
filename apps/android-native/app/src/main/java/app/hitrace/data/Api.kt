@@ -18,6 +18,17 @@ interface HitRaceApi {
     @POST("auth/dev/login")
     suspend fun login(@Body body: LoginBody): LoginResp
 
+    /** Coordinates optional: without them the server uses the 동네 you actually run in. */
+    @GET("boss")
+    suspend fun boss(
+        @Query("level") level: String = "dong",
+        @Query("lat") lat: Double? = null,
+        @Query("lng") lng: Double? = null,
+    ): BossStatus
+
+    @POST("swords/{id}/awaken")
+    suspend fun awaken(@Path("id") id: String): AwakenResult
+
     @GET("me")
     suspend fun me(): MeResp
 

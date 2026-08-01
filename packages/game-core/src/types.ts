@@ -143,6 +143,8 @@ export interface Sword {
   cp: number;
   /** Engraving slots and their fills. */
   engravings: Array<Engraving | null>;
+  /** 각성 단계 0..5. Growth past the upgrade ceiling, paid for with boss drops. */
+  awakening?: number;
   /** Source run id and course fingerprint. */
   runId: string;
   courseHash: string;

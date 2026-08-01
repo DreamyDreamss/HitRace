@@ -119,6 +119,7 @@ fun ManualRunScreen(vm: AppViewModel, onBack: () -> Unit, onForged: () -> Unit) 
                         RunSession.forged = res.sword
                         RunSession.records = res.records
                         RunSession.weeklyGoal = res.weeklyGoal
+                        RunSession.boss = res.boss
                         vm.refresh()
                         onForged()
                     }

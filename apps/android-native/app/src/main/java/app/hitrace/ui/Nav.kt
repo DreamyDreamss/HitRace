@@ -42,6 +42,7 @@ import app.hitrace.ui.screens.BattleScreen
 import app.hitrace.ui.screens.CodexScreen
 import app.hitrace.ui.screens.CollectionScreen
 import app.hitrace.ui.screens.CourseBoardScreen
+import app.hitrace.ui.screens.BossScreen
 import app.hitrace.ui.screens.ForgeResultScreen
 import app.hitrace.ui.screens.FusionScreen
 import app.hitrace.ui.screens.PartsScreen
@@ -71,6 +72,8 @@ object Routes {
     const val RUN = "run"
     const val SUMMARY = "run/summary"
     const val FORGE = "forge"
+    const val BOSS = "boss"
+    const val RAID = "raid"
     const val GACHA = "gacha"
     const val BATTLE = "pvp/battle"
     const val MANUAL = "run/manual"
@@ -126,6 +129,8 @@ fun MainScaffold(vm: AppViewModel, me: MeResp) {
                         onHistory = { nav.navigate(Routes.RUN_HISTORY) },
                         onRun = { nav.navigate(Routes.runDetail(it)) },
                         onRecovered = { nav.navigate(Routes.SUMMARY) },
+                        onBoss = { nav.navigate(Routes.BOSS) },
+                        onRaid = { nav.navigate(Routes.RAID) },
                     )
                 }
                 composable(Routes.COLLECTION) {
@@ -199,6 +204,12 @@ fun MainScaffold(vm: AppViewModel, me: MeResp) {
                         onForged = { nav.navigate(Routes.FORGE) { popUpTo(Routes.HOME) } },
                         onSavedOnly = { toHome() },
                     )
+                }
+                composable(Routes.BOSS) {
+                    BossScreen(onBack = { nav.popBackStack() }, onStartRun = { nav.navigate(Routes.RUN) })
+                }
+                composable(Routes.RAID) {
+                    BossScreen(onBack = { nav.popBackStack() }, onStartRun = { nav.navigate(Routes.RUN) }, level = "gu")
                 }
                 composable(Routes.FORGE) {
                     ForgeResultScreen(

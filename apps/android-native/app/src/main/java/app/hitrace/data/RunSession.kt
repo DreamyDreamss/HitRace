@@ -8,6 +8,8 @@ object RunSession {
     var records: RunRecords = RunRecords()
     /** Weekly-goal payout from the just-finished run, if it crossed the line. */
     var weeklyGoal: WeeklyGoalResult = WeeklyGoalResult()
+    /** What this run did to the neighbourhood bosses it passed through. */
+    var boss: BossOutcome? = null
 
     /**
      * Everything about the finished run, dropped at once. Clearing only some of it is how a
@@ -18,6 +20,7 @@ object RunSession {
         forged = null
         records = RunRecords()
         weeklyGoal = WeeklyGoalResult()
+        boss = null
     }
 }
 

@@ -62,10 +62,12 @@ data class Sword(
     val cp: Int = 0,
     val engravings: List<Engraving?> = emptyList(),
     val courseHash: String = "",
+    /** 각성 단계 0..5 — boss drops pay for growth past the upgrade ceiling. */
+    val awakening: Int = 0,
 )
 
 @Serializable
-data class Wallet(val ore: Int = 0, val engraveStone: Int = 0, val forgeTicket: Int = 0)
+data class Wallet(val ore: Int = 0, val engraveStone: Int = 0, val forgeTicket: Int = 0, val manaStone: Int = 0)
 
 @Serializable
 data class User(
@@ -141,12 +143,68 @@ data class WeeklyGoalResult(
     val bonus: GoalBonus = GoalBonus(),
 )
 
+// ── 동네 보스 ────────────────────────────────────────────────────────────────
+
+@Serializable
+data class BossRegion(val code: String = "", val name: String = "", val sido: String? = null, val level: String = "dong")
+
+@Serializable
+data class BossInfo(
+    val id: String = "",
+    val name: String = "",
+    val tier: Int = 1,
+    val hp: Long = 0,
+    val maxHp: Long = 1,
+    val seed: String = "",
+    val participants: Int = 0,
+    val cycleKey: String = "",
+) {
+    val hpFraction: Float get() = if (maxHp > 0) (hp.toDouble() / maxHp).toFloat().coerceIn(0f, 1f) else 0f
+}
+
+@Serializable
+data class BossContributor(
+    val rank: Int = 0,
+    val userId: String = "",
+    val handle: String = "",
+    val damage: Long = 0,
+    val runs: Int = 0,
+)
+
+@Serializable
+data class BossStatus(
+    val region: BossRegion? = null,
+    val boss: BossInfo? = null,
+    val leaderboard: List<BossContributor> = emptyList(),
+)
+
+/** What one run did to one region's boss — shown on the forge/summary screen. */
+@Serializable
+data class BossHit(
+    val region: BossRegion = BossRegion(),
+    val distanceKm: Double = 0.0,
+    val damage: Long = 0,
+    val boss: BossInfo = BossInfo(),
+    val killed: Boolean = false,
+    val manaStone: Int = 0,
+)
+
+@Serializable
+data class BossOutcome(val hits: List<BossHit> = emptyList(), val manaStone: Int = 0)
+
+@Serializable
+data class AwakenResult(val stage: Int = 0, val cost: AwakenCost = AwakenCost())
+
+@Serializable
+data class AwakenCost(val manaStone: Int = 0, val ore: Int = 0, val statBonus: Double = 0.0)
+
 @Serializable
 data class ForgeResult(
     val sword: Sword? = null,
     val rewards: Rewards = Rewards(),
     val records: RunRecords = RunRecords(),
     val weeklyGoal: WeeklyGoalResult = WeeklyGoalResult(),
+    val boss: BossOutcome? = null,
 )
 
 @Serializable

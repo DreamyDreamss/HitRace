@@ -26,6 +26,7 @@ function rowToSword(r: any): Sword {
     id: r.id, ownerId: r.owner_id, name: r.name, rarity: r.rarity,
     stats: { sharpness: r.sharpness, weight: r.weight, durability: r.durability, magic: r.magic },
     shape: r.shape, plus: r.plus, cp: r.cp, engravings: [], runId: r.run_id ?? 'seed',
+    awakening: r.awakening ?? 0,
     courseHash: r.course_hash, createdAt: new Date(r.created_at).getTime(),
   };
 }

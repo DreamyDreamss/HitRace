@@ -83,6 +83,7 @@ fun ForgeResultScreen(onDone: () -> Unit, onOpenSword: (String) -> Unit) {
         // Records earned by the run that made this blade — the running half of the reward.
         RecordBadges(RunSession.records)
         GoalBanner(RunSession.weeklyGoal)
+        BossDamage(RunSession.boss)
 
         // Sized from the space the body actually got, so the blade is never the reason something
         // else is pushed off. Aspect ratio held at the original 150:320.
@@ -155,6 +156,44 @@ private fun RecordBadges(r: app.hitrace.data.RunRecords) {
                     .background(Rb.Gold.copy(alpha = 0.13f))
                     .padding(horizontal = 10.dp, vertical = 5.dp),
             )
+        }
+    }
+}
+
+/**
+ * What this run did to the neighbourhoods it crossed.
+ *
+ * Shown here rather than only on the boss screen: the damage is a consequence of the run that was
+ * just finished, and this is the moment the runner is still thinking about it.
+ */
+@Composable
+private fun BossDamage(outcome: app.hitrace.data.BossOutcome?) {
+    val hits = outcome?.hits?.takeIf { it.isNotEmpty() } ?: return
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Rb.Surface2)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("동네 보스", color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp, letterSpacing = 2.sp)
+        hits.forEach { hit ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    hit.boss.name,
+                    color = if (hit.killed) Rb.Gold else Rb.Text2,
+                    fontSize = 12.5.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "%,d".format(hit.damage),
+                    color = Rb.Red, fontFamily = FontFamily.Monospace, fontSize = 12.5.sp,
+                )
+            }
+            if (hit.killed) {
+                Text(
+                    "★ 격파! 마력석 ${hit.manaStone}",
+                    color = Rb.Gold, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     }
 }

@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hitrace.AppViewModel
 import app.hitrace.data.ApiClient
+import app.hitrace.data.apiFailure
 import app.hitrace.data.ENGRAVING_CATALOG
 import app.hitrace.data.EngraveBody
 import app.hitrace.data.MeResp
@@ -138,6 +139,13 @@ fun SwordDetailScreen(
 
             msg?.let { Text(it, color = Rb.Gold2, fontSize = 13.sp) }
 
+            // 각성 — the growth axis boss drops pay for. Unlike upgrading it never fails, so it
+            // is presented as a cost rather than a gamble.
+            AwakenRow(s, busy) { stage ->
+                msg = "각성 ${'$'}stage 단계 — 전 스탯이 올랐습니다."
+                reload++
+            }
+
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 RbButton("강화하기", Modifier.weight(1.6f)) { onUpgrade(s.id) }
                 RbGhostButton("공방", Modifier.weight(1f)) { onWorkshop(s.id) }
@@ -213,6 +221,63 @@ fun SwordDetailScreen(
                         }
                     }
                     Spacer(Modifier.height(6.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 각성 stage and the button to advance it.
+ *
+ * Deliberately quiet when the blade is already maxed: a permanently disabled button is clutter.
+ */
+@Composable
+private fun AwakenRow(sword: Sword, parentBusy: Boolean, onDone: (Int) -> Unit) {
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var err by remember { mutableStateOf<String?>(null) }
+    val maxed = sword.awakening >= 5
+
+    RbCard {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("각성", color = Rb.Text2, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (maxed) "최종 단계" else "보스에서 얻은 마력석으로 강화 상한을 넘습니다",
+                        color = Rb.Muted, fontSize = 11.sp,
+                    )
+                }
+                Text(
+                    "★".repeat(sword.awakening) + "☆".repeat(5 - sword.awakening),
+                    color = Rb.Purple, fontSize = 14.sp,
+                )
+            }
+            err?.let { Text(it, color = Rb.Red, fontSize = 11.5.sp) }
+            if (!maxed) {
+                RbGhostButton(
+                    if (busy) "각성 중…" else "각성하기",
+                    Modifier.fillMaxWidth(),
+                    enabled = !busy && !parentBusy,
+                    tone = Rb.Purple,
+                ) {
+                    busy = true; err = null
+                    scope.launch {
+                        runCatching { ApiClient.api.awaken(sword.id) }
+                            .onSuccess { onDone(it.stage) }
+                            .onFailure {
+                                // The server says exactly what is missing; anything vaguer sends
+                                // the player hunting for a reason.
+                                err = when (it.apiFailure()?.code) {
+                                    "need_mana_stone" -> "마력석이 부족합니다. 동네 보스를 잡아 모으세요."
+                                    "need_ore" -> "철광석이 부족합니다."
+                                    "max_awakening" -> "이미 최종 각성 단계입니다."
+                                    else -> "각성에 실패했습니다."
+                                }
+                            }
+                        busy = false
+                    }
                 }
             }
         }
