@@ -109,12 +109,22 @@ private fun RecordBadges(r: app.hitrace.data.RunRecords) {
 
 @Composable
 private fun StatBars(s: Sword) {
-    val meta = listOf("예리함" to s.stats.sharpness, "중량" to s.stats.weight, "내구" to s.stats.durability, "마력" to s.stats.magic)
+    // The moment the sword appears is when someone actually reads these, so each one says what
+    // in the run produced it.
+    val meta = listOf(
+        Triple("예리함", "페이스", s.stats.sharpness),
+        Triple("중량", "고도 상승", s.stats.weight),
+        Triple("내구", "케이던스 일정함", s.stats.durability),
+        Triple("마력", "후반 구간력", s.stats.magic),
+    )
     val colors = listOf(Rb.Gold, Rb.Blue, Rb.Text2, Rb.Purple)
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Rb.Surface2).border(1.dp, Rb.Line, RoundedCornerShape(14.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        meta.forEachIndexed { i, (k, v) ->
+        meta.forEachIndexed { i, (k, source, v) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(k, color = Rb.Text3, fontSize = 12.sp, modifier = Modifier.width(46.dp))
+                Column(Modifier.width(58.dp)) {
+                    Text(k, color = Rb.Text3, fontSize = 12.sp)
+                    Text(source, color = Rb.Muted, fontSize = 9.sp)
+                }
                 Box(Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)).background(Rb.Surface4)) {
                     Box(Modifier.fillMaxWidth(minOf(1f, v / 900f)).height(6.dp).clip(RoundedCornerShape(3.dp)).background(colors[i]))
                 }

@@ -5,18 +5,64 @@ import { synthRun } from './fixtures.js';
 
 
 describe('missing sensors are absent, not zero', () => {
-  it('a run without heart rate gets a neutral magic rather than the floor', () => {
+  it('heart rate no longer affects anything — magic comes from pacing', () => {
     const withHr = synthRun({ distanceKm: 5 });
     const noHr = { ...withHr, heartRate: undefined };
-    const a = deriveStats(deriveMetrics(withHr));
-    const b = deriveStats(deriveMetrics(noHr));
-    // Not the floor — a runner without a watch must not be handed the worst possible stat.
-    expect(b.magic).toBeGreaterThan(0);
-    expect(Math.abs(b.magic - a.magic)).toBeLessThan(a.magic); // same order of magnitude
+    expect(deriveStats(deriveMetrics(noHr)).magic).toBe(deriveStats(deriveMetrics(withHr)).magic);
   });
   it('a run without cadence gets a neutral durability', () => {
     const noCadence = { ...synthRun({ distanceKm: 5 }), cadence: undefined };
     expect(deriveStats(deriveMetrics(noCadence)).durability).toBeGreaterThan(0);
+  });
+});
+
+describe('magic ← finishing power', () => {
+  /** A 6 km run whose pace changes linearly from `startPace` to `endPace` (sec/km). */
+  const paced = (startPace: number, endPace: number) => {
+    const n = 240;
+    const points = [];
+    let t = 1_700_000_000_000;
+    let metres = 0;
+    for (let i = 0; i < n; i++) {
+      const f = i / (n - 1);
+      const pace = startPace + (endPace - startPace) * f;
+      points.push({ lat: 37.5285 + metres / 111_320, lng: 126.933, ele: 20, t });
+      const step = 6000 / (n - 1);
+      metres += step;
+      t += Math.round((step / 1000) * pace * 1000);
+    }
+    return { points };
+  };
+
+  const magicOf = (track: ReturnType<typeof paced>) => deriveStats(deriveMetrics(track)).magic;
+
+  it('an evenly-paced run sits at the neutral midpoint', () => {
+    expect(deriveMetrics(paced(330, 330)).finishingPower).toBeCloseTo(0.5, 2);
+    expect(magicOf(paced(330, 330))).toBe(470);
+  });
+
+  it('finishing strong beats fading, and fading beats nothing', () => {
+    const strong = magicOf(paced(350, 310)); // negative split
+    const even = magicOf(paced(330, 330));
+    const fade = magicOf(paced(310, 350)); // positive split
+    expect(strong).toBeGreaterThan(even);
+    expect(even).toBeGreaterThan(fade);
+    expect(fade).toBeGreaterThanOrEqual(120); // never below the floor
+  });
+
+  it('is a ratio, not a speed — the same shape at any pace scores the same', () => {
+    // Both fade by the same proportion; one runner is simply quicker.
+    expect(Math.abs(magicOf(paced(300, 330)) - magicOf(paced(400, 440)))).toBeLessThan(25);
+  });
+
+  it('sandbagging the first half costs more than it earns', () => {
+    // Deliberately crawl, then run: magic climbs, but the pace bonus and sharpness both fall.
+    const honest = deriveMetrics(paced(320, 320)); // even, comfortably under the pace bonus
+    const gamed = deriveMetrics(paced(480, 300)); // crawl then sprint — avg pace ≈ 6'30\"/km
+    expect(deriveStats(gamed).magic).toBeGreaterThan(deriveStats(honest).magic);
+    expect(deriveStats(gamed).sharpness).toBeLessThan(deriveStats(honest).sharpness);
+    const scoreOf = (m: typeof honest) => computeForgeScore(m, { repeatIndex: 0, isNewCourse: true }).total;
+    expect(scoreOf(gamed)).toBeLessThan(scoreOf(honest));
   });
 });
 

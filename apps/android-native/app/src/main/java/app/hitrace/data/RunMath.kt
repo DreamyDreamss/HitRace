@@ -66,6 +66,59 @@ object RunMath {
         else -> "N"
     }
 
+    /**
+     * Mirrors the engine's finishing power (0..1, 0.5 = evenly paced) so the summary screen can
+     * show what the run earned before it is submitted. The server's number is authoritative;
+     * this exists so the runner sees the consequence of how they paced while it still means
+     * something to them.
+     */
+    fun finishingPower(pts: List<GpsPointDto>): Double {
+        if (pts.size < 6) return 0.5
+        val start = pts.first().t
+        val total = pts.last().t - start
+        if (total <= 0) return 0.5
+
+        var cut = pts.indexOfFirst { it.t - start >= total / 2 }
+        if (cut < 1 || cut >= pts.size - 1) cut = pts.size / 2
+        val first = pts.subList(0, cut + 1)
+        val second = pts.subList(cut, pts.size)
+        val d1 = pathMeters(first)
+        val d2 = pathMeters(second)
+        if (d1 < 200 || d2 < 200) return 0.5
+        val s1 = (first.last().t - first.first().t) / 1000.0
+        val s2 = (second.last().t - second.first().t) / 1000.0
+        if (s1 <= 0 || s2 <= 0) return 0.5
+        val p1 = s1 / (d1 / 1000.0)
+        val p2 = s2 / (d2 / 1000.0)
+        val splitScore = balanced((p1 - p2) / p1, 0.12)
+
+        val totalM = pathMeters(pts)
+        val totalSec = (pts.last().t - start) / 1000.0
+        if (totalM < 800 || totalSec <= 0) return splitScore
+        val stretch = min(1000.0, totalM * 0.25)
+        var covered = 0.0
+        var i = pts.size - 1
+        while (i > 0 && covered < stretch) { covered += haversine(pts[i - 1], pts[i]); i-- }
+        if (covered < 200) return splitScore
+        val sec = (pts.last().t - pts[i].t) / 1000.0
+        if (sec <= 0) return splitScore
+        val closing = sec / (covered / 1000.0)
+        val avg = totalSec / (totalM / 1000.0)
+        val surgeScore = balanced((avg - closing) / avg, 0.15)
+        return (splitScore * 0.6 + surgeScore * 0.4).coerceIn(0.0, 1.0)
+    }
+
+    private fun balanced(delta: Double, span: Double) = ((delta / span).coerceIn(-1.0, 1.0) + 1) / 2
+
+    /** Plain-language reading of [finishingPower]. */
+    fun finishingLabel(p: Double): String = when {
+        p >= 0.72 -> "후반 폭발"
+        p >= 0.58 -> "후반 상승"
+        p > 0.42 -> "고른 페이스"
+        p > 0.28 -> "후반 저하"
+        else -> "후반 급저하"
+    }
+
     fun oreReward(distanceKm: Double) = (distanceKm * 8).roundToInt()
     fun ticketReward(distanceKm: Double) = if (distanceKm >= 3) 1 else 0
 

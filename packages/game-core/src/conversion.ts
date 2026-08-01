@@ -14,6 +14,7 @@ import {
   haversine,
   normalize,
   pathLengthMeters,
+  segmentMeters,
   smooth,
   toLocalXY,
 } from './geo.js';
@@ -66,6 +67,7 @@ export function deriveMetrics(track: RunTrack): RunMetrics {
     hrZoneFraction,
     hasHeartRate: (track.heartRate ?? []).length > 0,
     hasCadence: avgCadence > 0,
+    finishingPower: computeFinishingPower(pts),
     isRoundTrip,
     isClosedLoop,
     curviness: c,
@@ -83,6 +85,80 @@ function computeHrZoneFraction(track: RunTrack): number {
   const hi = max * 0.9;
   const inZone = hr.filter((v) => v >= lo && v <= hi).length;
   return inZone / hr.length;
+}
+
+/**
+ * How much the runner had left at the end, 0..1, with **0.5 meaning an evenly-paced run**.
+ *
+ * This is what the magic stat is made of. It replaced heart-rate zone time, which no phone can
+ * measure without a watch — the app was inventing the samples, so every sword got the same
+ * magic and the stat meant nothing.
+ *
+ * Two parts, both from GPS and the clock alone:
+ * - **Split**: second half's pace against the first half's. Most runners fade; holding pace is
+ *   already good, and finishing faster is the discipline this stat is about.
+ * - **Closing surge**: the last kilometre against the run's own average.
+ *
+ * Deliberately a *ratio*, never an absolute speed — absolute speed is already sharpness. And the
+ * obvious exploit (jog the first half to manufacture a split) pays for itself: it drags the
+ * average pace down, which is exactly what sharpness and the pace bonus are scored on.
+ */
+function computeFinishingPower(pts: GpsPoint[]): number {
+  const EVEN = 0.5;
+  const halves = halfPaces(pts);
+  if (!halves) return EVEN;
+
+  // A 12% faster second half is about as good as it gets over a normal training run.
+  const splitScore = balanced((halves.first - halves.second) / halves.first, 0.12);
+
+  const closing = closingPace(pts);
+  if (closing == null) return splitScore;
+  const avgPace = closing.totalSec / (closing.totalM / 1000);
+  const surgeScore = balanced((avgPace - closing.pace) / avgPace, 0.15);
+  return clamp(splitScore * 0.6 + surgeScore * 0.4, 0, 1);
+}
+
+/** Maps a signed ratio to 0..1 with 0 landing on 0.5 — "even" is the middle, not the bottom. */
+function balanced(delta: number, span: number): number {
+  return (clamp(delta / span, -1, 1) + 1) / 2;
+}
+
+/** Average pace (sec/km) of each half of the run, split at the halfway point **in time**. */
+function halfPaces(pts: GpsPoint[]): { first: number; second: number } | null {
+  if (pts.length < 6) return null;
+  const start = pts[0]!.t;
+  const total = pts[pts.length - 1]!.t - start;
+  if (total <= 0) return null;
+
+  let cut = pts.findIndex((p) => p.t - start >= total / 2);
+  if (cut < 1 || cut >= pts.length - 1) cut = Math.floor(pts.length / 2);
+
+  const first = pts.slice(0, cut + 1);
+  const second = pts.slice(cut);
+  const d1 = pathLengthMeters(first);
+  const d2 = pathLengthMeters(second);
+  // Too little ground in either half and the ratio is noise, not pacing.
+  if (d1 < 200 || d2 < 200) return null;
+  const s1 = (first[first.length - 1]!.t - first[0]!.t) / 1000;
+  const s2 = (second[second.length - 1]!.t - second[0]!.t) / 1000;
+  if (s1 <= 0 || s2 <= 0) return null;
+  return { first: s1 / (d1 / 1000), second: s2 / (d2 / 1000) };
+}
+
+/** Pace over the closing stretch — the last kilometre, or the last quarter of a shorter run. */
+function closingPace(pts: GpsPoint[]): { pace: number; totalM: number; totalSec: number } | null {
+  const totalM = pathLengthMeters(pts);
+  const totalSec = (pts[pts.length - 1]!.t - pts[0]!.t) / 1000;
+  if (totalM < 800 || totalSec <= 0) return null;
+  const stretch = Math.min(1000, totalM * 0.25);
+
+  let covered = 0;
+  let i = pts.length - 1;
+  for (; i > 0 && covered < stretch; i--) covered += segmentMeters(pts[i - 1]!, pts[i]!);
+  if (covered < 200) return null;
+  const sec = (pts[pts.length - 1]!.t - pts[i]!.t) / 1000;
+  if (sec <= 0) return null;
+  return { pace: sec / (covered / 1000), totalM, totalSec };
 }
 
 function computeNegativeSplit(pts: GpsPoint[]): boolean {
@@ -118,13 +194,16 @@ export function deriveStats(m: RunMetrics): Stats {
       ? Math.round(clamp(s.durability.base - m.cadenceStability * s.durability.stabilityPenaltyPerCv, s.durability.floor, s.durability.base))
       : Math.round((s.durability.base + s.durability.floor) / 2);
 
-  // Magic ← HR-zone fraction. Without a heart-rate source (which is most phones) this is not
-  // "zero time in zone", it is "unknown" — so it takes the midpoint, the same way durability
-  // does when there is no cadence. Scoring absence as zero would quietly make every sword
-  // forged without a watch weaker than every sword forged before this was measured honestly.
-  const magic = m.hasHeartRate
-    ? Math.round(clamp(s.magic.floor + m.hrZoneFraction * s.magic.maxFromZone, s.magic.floor, s.magic.floor + s.magic.maxFromZone))
-    : Math.round(s.magic.floor + s.magic.maxFromZone / 2);
+  // Magic ← finishing power: what the runner had left at the end. An evenly-paced run sits at
+  // the midpoint, fading drops below it, finishing strong climbs above. Measurable on any phone,
+  // and it drives the combat special gauge — the reserve you saved is the reserve you unleash.
+  const magic = Math.round(
+    clamp(
+      s.magic.floor + m.finishingPower * s.magic.maxFromFinish,
+      s.magic.floor,
+      s.magic.floor + s.magic.maxFromFinish,
+    ),
+  );
 
   return { sharpness, weight, durability, magic };
 }

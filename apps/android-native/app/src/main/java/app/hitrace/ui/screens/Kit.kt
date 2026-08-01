@@ -130,13 +130,14 @@ fun Meter(fraction: Float, tone: Color = Rb.Gold, modifier: Modifier = Modifier)
     }
 }
 
-class StatMeta(val label: String, val color: Color, val pick: (Stats) -> Int)
+/** [source] is what the runner did to earn it — a stat nobody can trace back is just a number. */
+class StatMeta(val label: String, val source: String, val color: Color, val pick: (Stats) -> Int)
 
 val STAT_META = listOf(
-    StatMeta("예리함", Rb.Gold) { it.sharpness },
-    StatMeta("중량", Rb.Blue) { it.weight },
-    StatMeta("내구", Rb.Text2) { it.durability },
-    StatMeta("마력", Rb.Purple) { it.magic },
+    StatMeta("예리함", "페이스", Rb.Gold) { it.sharpness },
+    StatMeta("중량", "고도 상승", Rb.Blue) { it.weight },
+    StatMeta("내구", "케이던스 일정함", Rb.Text2) { it.durability },
+    StatMeta("마력", "후반 구간력", Rb.Purple) { it.magic },
 )
 
 @Composable
@@ -148,7 +149,10 @@ fun StatBarsCard(stats: Stats) {
                 val color = m.color
                 val v = m.pick(stats)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(label, color = Rb.Text3, fontSize = 12.sp, modifier = Modifier.width(46.dp))
+                    Column(Modifier.width(58.dp)) {
+                        Text(label, color = Rb.Text3, fontSize = 12.sp)
+                        Text(m.source, color = Rb.Muted, fontSize = 9.sp)
+                    }
                     Meter(v / 900f, color, Modifier.weight(1f))
                     Spacer(Modifier.size(10.dp))
                     Text("$v", color = Rb.Text2, fontFamily = FontFamily.Monospace, fontSize = 12.sp, modifier = Modifier.width(40.dp))

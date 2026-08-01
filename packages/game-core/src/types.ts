@@ -50,6 +50,12 @@ export interface RunMetrics {
   hasHeartRate: boolean;
   /** Whether the run carried measured cadence (a step detector, not an invented figure). */
   hasCadence: boolean;
+  /**
+   * What the runner had left at the end, 0..1. **0.5 is an evenly-paced run**; fading falls
+   * below it, a negative split and a closing surge climb above. Derived from GPS and the clock
+   * only, so every phone can earn it.
+   */
+  finishingPower: number;
   /** True if the route returns near its start (out-and-back or loop). */
   isRoundTrip: boolean;
   /** True if the path forms a closed loop (start≈end AND encloses area). */

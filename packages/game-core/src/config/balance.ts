@@ -57,7 +57,10 @@ export const BALANCE = {
     sharpness: { minPaceSecPerKm: 240, maxPaceSecPerKm: 420, min: 250, max: 900 },
     weight: { perElevationM: 6, cap: 900, floor: 120 },
     durability: { base: 760, stabilityPenaltyPerCv: 900, floor: 200 },
-    magic: { maxFromZone: 700, floor: 120 },
+    // Magic comes from finishing power (see conversion.ts). An even run scores 0.5 → 470,
+    // which is exactly the neutral value swords were given while this stat had no real source,
+    // so nothing already forged is devalued by the change.
+    magic: { maxFromFinish: 700, floor: 120 },
   },
 
   combat: {

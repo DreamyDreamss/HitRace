@@ -126,6 +126,23 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
                 ScoreRow("고도 보너스", score.elev)
             }
         }
+        // How the run was paced decides the sword's 마력. Shown here, before forging, because
+        // that is the only moment it can still change how someone runs tomorrow.
+        val finish = remember(track.points) { RunMath.finishingPower(track.points) }
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Rb.Surface2).border(1.dp, Rb.Line, RoundedCornerShape(14.dp)).padding(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("후반 구간력", color = Rb.Text3, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    Text(
+                        RunMath.finishingLabel(finish),
+                        color = if (finish >= 0.58) Rb.Purple else if (finish > 0.42) Rb.Text2 else Rb.Muted,
+                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Meter(finish.toFloat(), Rb.Purple, Modifier.fillMaxWidth())
+                Text("검의 마력이 됩니다 — 후반을 전반보다 빠르게 달릴수록 높아집니다.", color = Rb.Muted, fontSize = 11.sp)
+            }
+        }
         Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Rb.Gold.copy(alpha = 0.1f)).border(1.dp, Rb.Gold.copy(alpha = 0.35f), RoundedCornerShape(14.dp)).padding(14.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("획득 예정", color = Rb.Gold2, fontSize = 13.sp, modifier = Modifier.weight(1f))
