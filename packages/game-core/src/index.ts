@@ -17,6 +17,22 @@ export {
   fingerprint,
 } from './conversion.js';
 export { computeSplits, bestKmPace } from './splits.js';
+// ── 동네 보스 ─────────────────────────────────────────────────────────────────
+export { bossMaxHp, joinBoss, nextCycleStartTier } from './boss/hp.js';
+export {
+  computeDamage,
+  allocateRegions,
+  paceFactor,
+  elevationFactor,
+  swordFactor,
+  streakFactor,
+} from './boss/damage.js';
+export type { DamageInput, DamageBreakdown, RegionShare } from './boss/damage.js';
+export { bossName, bossSeed, weekKey, monthKey } from './boss/naming.js';
+export { distributeRewards } from './boss/rewards.js';
+export type { Contribution, Payout } from './boss/rewards.js';
+export { awakenCost, awakenBonus, applyAwakening, maxAwakenStage } from './boss/awaken.js';
+export type { AwakenCost } from './boss/awaken.js';
 export type { Split } from './splits.js';
 export { forgeSword } from './forge.js';
 export type { ForgeContext, ForgeOutcome } from './forge.js';

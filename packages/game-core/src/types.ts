@@ -160,7 +160,8 @@ export interface Engraving {
 }
 
 // ── Economy ──────────────────────────────────────────────────────────────────
-export type Currency = 'ore' | 'engraveStone' | 'forgeTicket';
+/** `manaStone` drops only from bosses and is the sole currency 각성 accepts. */
+export type Currency = 'ore' | 'engraveStone' | 'forgeTicket' | 'manaStone';
 export type Wallet = Record<Currency, number>;
 
 // ── Combat ───────────────────────────────────────────────────────────────────

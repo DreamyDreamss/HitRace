@@ -110,6 +110,74 @@ export const BALANCE = {
     statGainPerPlus: { sharpness: 0.07, weight: 0.045, durability: 0.037, magic: 0.05 },
   },
 
+  // ── 동네 보스 ───────────────────────────────────────────────────────────────
+  boss: {
+    /**
+     * HP of a tier-1 boss facing one runner. Calibrated so a solo runner clears it in about a
+     * week: a CP 1600 sword over 6 km at 5'30" deals ≈ 10,000, so four runs.
+     */
+    baseHp: 40_000,
+    /** Each cleared tier makes the next one this much sturdier. */
+    tierHpGrowth: 1.6,
+    /**
+     * Extra HP per additional participant. Below 1.0 on purpose: five runners face 3.4× the HP,
+     * not 5×, so **each of them does less work than a soloist would**. Calling a neighbour in has
+     * to make your own week easier, or nobody calls.
+     */
+    hpPerExtraParticipant: 0.6,
+
+    /** Pace at which the pace multiplier is exactly 1.0, and where it saturates. */
+    paceNeutralSecPerKm: 360, // 6'00"
+    paceBestSecPerKm: 240, // 4'00"
+    paceFactorRange: { min: 0.8, max: 1.4 },
+    /** Elevation: 1 + gain × this, capped. */
+    elevationPerMeter: 1 / 500,
+    elevationFactorCap: 1.3,
+    /**
+     * Sword contribution: (cp / cpReference)^cpExponent. The exponent is well under 1 so tripling
+     * CP roughly doubles damage — the sword clearly matters, but a veteran cannot drown out a
+     * neighbourhood of new runners. This is a running app: distance leads, the sword multiplies.
+     */
+    cpReference: 1000,
+    cpExponent: 0.8,
+    /** No sword equipped — you still contribute, weakly. */
+    noSwordFactor: 0.5,
+    /** Reuses the running streak the app already tracks. */
+    streakBonusPerDay: 0.03,
+    streakBonusCap: 0.2,
+
+    /** Damaging runs per day, per region. Running more is fine; it just stops adding damage. */
+    maxDamagingRunsPerDay: 3,
+    /** A region taking less than this share of a run is noise, not a visit. */
+    minRegionShare: 0.1,
+    /** At most this many regions credited from one run. */
+    maxRegionsPerRun: 3,
+
+    /** Mana stones for clearing a tier-1 boss; scales with tier. */
+    stoneBaseReward: 6,
+    stoneTierGrowth: 1.45,
+    /** Half of the drop is for showing up, half tracks contribution. */
+    stoneParticipationShare: 0.5,
+    /** Below this share of the boss's HP you get nothing. */
+    minRewardShare: 0.01,
+    /** Extra stones for the top contributor and for whoever lands the kill. */
+    topContributorBonus: 4,
+    finalBlowBonus: 3,
+  },
+
+  /** 각성 — growth past the upgrade ceiling, paid for with boss drops. Never fails. */
+  awakening: {
+    maxStage: 5,
+    /** stage → { manaStone, ore, statBonus } */
+    stages: [
+      { manaStone: 8, ore: 800, statBonus: 0.06 },
+      { manaStone: 20, ore: 2_000, statBonus: 0.13 },
+      { manaStone: 45, ore: 4_500, statBonus: 0.21 },
+      { manaStone: 90, ore: 9_000, statBonus: 0.30 },
+      { manaStone: 180, ore: 18_000, statBonus: 0.40 },
+    ],
+  },
+
   gacha: {
     ticketPerPull: 1,
     ticketPer10Pull: 9,
