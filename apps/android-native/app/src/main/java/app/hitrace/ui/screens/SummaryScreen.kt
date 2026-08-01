@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import app.hitrace.AuthState
 import app.hitrace.AppViewModel
 import app.hitrace.data.ApiClient
+import app.hitrace.data.Balance
 import app.hitrace.data.RunBody
 import app.hitrace.data.RunMath
 import app.hitrace.data.PendingRunStore
@@ -96,6 +97,12 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
     // instead of failing on tap.
     val budget = (vm.auth.collectAsState().value as? AuthState.LoggedIn)?.me?.forge
     val capReached = budget?.exhausted == true
+
+    // The minimums are known here, so say so up front rather than letting the tap fail.
+    // Saving the record is still allowed — a short walk is something that happened.
+    val shortDistance = m.distanceKm < Balance.MIN_DISTANCE_KM
+    val shortDuration = m.durationSec < Balance.MIN_DURATION_SEC
+    val tooShort = shortDistance || shortDuration
 
     Column(
         Modifier.fillMaxSize().background(Rb.Bg).verticalScroll(rememberScrollState()).padding(20.dp),
@@ -174,6 +181,17 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
                 color = Rb.Text3, fontSize = 12.5.sp,
             )
         }
+        if (tooShort && !capReached) {
+            val missing = listOfNotNull(
+                if (shortDistance) "%.2fkm / 1.00km".format(m.distanceKm) else null,
+                if (shortDuration) "${(m.durationSec / 60).toInt()}분 / 10분" else null,
+            ).joinToString(" · ")
+            Text(
+                "주조하려면 1km·10분이 필요합니다 ($missing). 기록은 저장할 수 있고, " +
+                    "보상은 붙지 않습니다.",
+                color = Rb.Text3, fontSize = 12.5.sp,
+            )
+        }
         Spacer(Modifier.height(4.dp))
         if (queued) {
             // Nothing more to decide here — the run is safe and the choice is already recorded.
@@ -189,8 +207,8 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedBtn("기록만 저장", Modifier.weight(1f)) { if (!busy) submit(false) }
             Button(
-                onClick = { if (!busy && !capReached) submit(true) },
-                enabled = !busy && !capReached,
+                onClick = { if (!busy && !capReached && !tooShort) submit(true) },
+                enabled = !busy && !capReached && !tooShort,
                 modifier = Modifier.weight(1.6f).height(54.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -202,6 +220,7 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
                     when {
                         busy -> "주조 중…"
                         capReached -> "내일 다시 주조"
+                        tooShort -> "1km·10분 필요"
                         else -> "검 주조하기"
                     },
                     fontWeight = FontWeight.Bold, fontSize = 16.sp,

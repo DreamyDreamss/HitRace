@@ -130,7 +130,21 @@ export class GameService {
     const now = Date.now();
     const runId = id('run');
 
-    if (!validation.ok) {
+    // Two different kinds of "no".
+    //
+    // "Too short" is not a data problem — a 300 m walk is something the person actually did, and
+    // refusing to even file it (which is what used to happen: 기록만 저장 failed too) throws away
+    // a real record to enforce a *forge* rule. Short runs are recorded, earn nothing, and forge
+    // nothing. Everything else in `reasons` means the track can't be trusted at all, and that is
+    // still a rejection.
+    const belowThreshold = validation.reasons.filter(
+      (r) => r === 'below_min_distance' || r === 'below_min_duration',
+    );
+    const untrustworthy = validation.reasons.filter(
+      (r) => r !== 'below_min_distance' && r !== 'below_min_duration',
+    );
+
+    if (untrustworthy.length > 0) {
       const rec: RunRecord = {
         id: runId, userId, status: 'rejected', courseHash, repeatIndex: priorRepeats,
         distanceKm: 0, durationSec: 0, avgPaceSecPerKm: 0, elevationGainM: 0,
@@ -138,6 +152,12 @@ export class GameService {
       };
       await this.repo.createRun(rec);
       throw new ServiceError('run_rejected:' + validation.reasons.join(','), 422);
+    }
+
+    // A sword needs a real run behind it; the record does not.
+    const tooShortToForge = belowThreshold.length > 0;
+    if (opts.forge && tooShortToForge) {
+      throw new ServiceError('run_rejected:' + belowThreshold.join(','), 422);
     }
 
     // Daily forge cap.
@@ -164,13 +184,16 @@ export class GameService {
       route: decimate(clean.points, 300),
       swordId: opts.forge ? swordId : undefined,
     };
-    // Compare against history *before* the row lands, then store.
-    const records = await this.detectRecords(userId, rec);
+    // Personal bests, rewards and the streak all belong to runs that met the bar. A short walk
+    // is filed as history and nothing more — otherwise a 300 m stroll could set a pace record or
+    // farm ore, which is the abuse the minimums exist to stop.
+    const records = tooShortToForge ? undefined : await this.detectRecords(userId, rec);
     await this.repo.createRun(rec);
 
-    // Rewards (ore capped daily; tickets uncapped) — always granted for a valid run.
-    const rewards = await this.grantRunRewards(userId, metrics.distanceKm, runId, now);
-    await this.bumpStreak(userId, now);
+    const rewards = tooShortToForge
+      ? { ore: 0, forgeTicket: 0 }
+      : await this.grantRunRewards(userId, metrics.distanceKm, runId, now);
+    if (!tooShortToForge) await this.bumpStreak(userId, now);
 
     if (opts.forge) {
       await this.repo.addSword(sword);
@@ -179,9 +202,20 @@ export class GameService {
       await this.repo.recordCourseScore({ courseHash, userId, handle: user.handle, bestScore: score.total, bestCp: sword.cp, at: now });
     }
 
-    const weeklyGoal = await this.grantWeeklyGoalBonus(userId, metrics.distanceKm, now);
+    const weeklyGoal = tooShortToForge
+      ? undefined
+      : await this.grantWeeklyGoalBonus(userId, metrics.distanceKm, now);
 
-    return { run: rec, sword: opts.forge ? sword : undefined, metrics, rewards, records, weeklyGoal };
+    return {
+      run: rec,
+      sword: opts.forge ? sword : undefined,
+      metrics,
+      rewards,
+      records,
+      weeklyGoal,
+      // Told plainly so the client can say "저장했지만 보상은 없습니다" instead of implying a payout.
+      belowThreshold: tooShortToForge ? belowThreshold : undefined,
+    };
   }
 
   // ── Manual / treadmill forge (no GPS) ──────────────────────────────────────

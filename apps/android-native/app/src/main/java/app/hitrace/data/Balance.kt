@@ -11,6 +11,11 @@ import kotlin.math.roundToInt
  * Keep in sync with `config/balance.ts` and `economy.ts`.
  */
 object Balance {
+    // run — the forge minimums. Mirrored so the summary screen can say why the button is off
+    // instead of letting the tap fail against the server.
+    const val MIN_DISTANCE_KM = 1.0
+    const val MIN_DURATION_SEC = 600.0
+
     // economy.upgrade
     private const val UPGRADE_BASE_COST = 120.0
     private const val UPGRADE_COST_GROWTH = 1.4

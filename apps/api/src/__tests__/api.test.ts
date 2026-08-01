@@ -82,8 +82,36 @@ describe('auth & me', () => {
 });
 
 describe('runs → forge', () => {
-  it('rejects a too-short run', async () => {
-    const res = await app.inject({ method: 'POST', url: '/runs', headers: H(), payload: { track: synthRun(0.4) } });
+  it('refuses to forge a too-short run', async () => {
+    const res = await app.inject({ method: 'POST', url: '/runs', headers: H(), payload: { track: synthRun(0.4), forge: true } });
+    expect(res.statusCode).toBe(422);
+    expect(JSON.parse(res.body).error).toContain('below_min_distance');
+  });
+
+  it('still records a too-short run when the runner only wants it saved', async () => {
+    // A 400 m walk is something that happened. Refusing to file it — which is what "기록만 저장"
+    // used to do — throws away a real record to enforce a forge rule.
+    const login = await app.inject({ method: 'POST', url: '/auth/dev/login', payload: { handle: 'stroller' } });
+    const h = { authorization: `Bearer ${JSON.parse(login.body).token}` };
+    const before = JSON.parse((await app.inject({ method: 'GET', url: '/wallet', headers: h })).body);
+
+    const res = await app.inject({ method: 'POST', url: '/runs', headers: h, payload: { track: synthRun(0.4), forge: false } });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.sword).toBeUndefined();
+    expect(body.belowThreshold).toContain('below_min_distance');
+    // Filed, but it earns nothing — that is what the minimums are actually for.
+    expect(body.rewards).toEqual({ ore: 0, forgeTicket: 0 });
+    const after = JSON.parse((await app.inject({ method: 'GET', url: '/wallet', headers: h })).body);
+    expect(after.ore).toBe(before.ore);
+    expect(JSON.parse((await app.inject({ method: 'GET', url: '/runs', headers: h })).body)).toHaveLength(1);
+  });
+
+  it('an untrustworthy short run is still rejected outright', async () => {
+    // Short *and* fabricated: the leniency is for small runs, not for bad data.
+    const track = synthRun(0.4);
+    for (let i = Math.floor(track.points.length / 2); i < track.points.length; i++) track.points[i]!.lat += 0.05;
+    const res = await app.inject({ method: 'POST', url: '/runs', headers: H(), payload: { track, forge: false } });
     expect(res.statusCode).toBe(422);
   });
 

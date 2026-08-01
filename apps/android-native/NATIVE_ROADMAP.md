@@ -72,6 +72,22 @@ consistency check between `data/Balance.kt` and `packages/game-core`.
   `LinkText` — 48dp target, announced as a button — and bottom-nav items carry `Role.Tab` +
   selected state.
 
+## 짧은 러닝도 기록은 남는다 (2026-08-01)
+0.30km를 뛰고 "기록만 저장"을 눌렀는데 저장되지 않는다는 제보. 서버가 `forge` 여부와 상관없이
+같은 검증을 걸어, 1km 미달이면 **기록 자체를 거부**하고 있었습니다.
+
+거절 사유를 두 종류로 나눴습니다.
+- **신뢰할 수 없는 데이터**(gps_jump·vehicle_suspected·pace_too_fast·non_monotonic_time·
+  too_few_points) → 그대로 422 거절. 트랙을 믿을 수 없습니다.
+- **기준 미달**(below_min_distance·below_min_duration) → **기록은 저장**하고 주조만 거부.
+  300m를 걸은 건 실제로 일어난 일이고, 주조 규칙을 강제하려고 진짜 기록을 버릴 이유가 없습니다.
+  대신 보상·개인기록·연속일수·주간목표 보너스는 붙지 않습니다 — 최소 기준이 막으려던 게 그것입니다.
+
+앱은 이제 요약 화면에서 **미리** 판단합니다: 버튼이 "1km·10분 필요"로 비활성화되고 얼마가
+모자란지(예: `0.30km / 1.00km · 3분 / 10분`) 보여줍니다. 눌러서 실패하게 두지 않습니다.
+
+라이브 검증: forge=true → 422, forge=false → 200(0.30km 저장, 보상 0, 지갑 변화 없음).
+
 ## Rundex 대조 개선 P0~P2 (2026-08-01)
 `D:\Rundex`(출시된 러닝 앱)와 대조해 뽑은 계획(`docs/RUNDEX_LESSONS.md`)의 1~7번 실행.
 
