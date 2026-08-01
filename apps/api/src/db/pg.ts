@@ -258,6 +258,7 @@ export class PgRepo implements Repo {
     if (patch.cp != null) { sets.push(`cp=$${i++}`); vals.push(patch.cp); }
     if (patch.shape != null) { sets.push(`shape=$${i++}`); vals.push(JSON.stringify(patch.shape)); }
     if (patch.name != null) { sets.push(`name=$${i++}`); vals.push(patch.name); }
+    if (patch.awakening != null) { sets.push(`awakening=$${i++}`); vals.push(patch.awakening); }
     if (patch.engravings != null) {
       // Rewrite the slot rows for this sword.
       await this.q('DELETE FROM sword_engravings WHERE sword_id=$1', [id]);

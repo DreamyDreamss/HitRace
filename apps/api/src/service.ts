@@ -4,6 +4,7 @@
 import {
   BALANCE,
   applyUpgrade,
+  awakenBonus,
   computeCP,
   computeForgeScore,
   dismantleYield,
@@ -289,12 +290,26 @@ export class GameService {
     const sword = await this.repo.getSword(swordId);
     if (!sword || sword.ownerId !== userId) throw new ServiceError('not_your_sword', 404);
     const wallet = await this.repo.getWallet(userId);
+    const before = sword.awakening ?? 0;
     const result = await service.awaken(userId, swordId, wallet.ore);
     if (!result.ok) throw new ServiceError(result.reason, 400);
     await this.repo.applyCurrency({
       userId, currency: 'ore', delta: -result.cost.ore, reason: 'awaken', refId: swordId, createdAt: Date.now(),
     });
-    return { stage: result.stage, cost: result.cost };
+
+    // Apply only the *incremental* factor. The stored stats already carry every upgrade and every
+    // earlier awakening, so multiplying by the cumulative bonus again would compound it.
+    const step = (1 + awakenBonus(result.stage)) / (1 + awakenBonus(before));
+    const stats = {
+      sharpness: Math.round(sword.stats.sharpness * step),
+      weight: Math.round(sword.stats.weight * step),
+      durability: Math.round(sword.stats.durability * step),
+      magic: Math.round(sword.stats.magic * step),
+    };
+    const updated = await this.repo.updateSword(swordId, {
+      stats, cp: computeCP(stats), awakening: result.stage,
+    });
+    return { stage: result.stage, cost: result.cost, sword: updated };
   }
 
   // ── Manual / treadmill forge (no GPS) ──────────────────────────────────────
