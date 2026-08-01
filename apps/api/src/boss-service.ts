@@ -12,6 +12,8 @@ import {
   distributeRewards,
   joinBoss,
   monthKey,
+  nextCycleStartTier,
+  previousCycleKey,
   weekKey,
 } from '@hitrace/game-core';
 import type { Element } from '@hitrace/game-core';
@@ -134,9 +136,19 @@ export class BossService {
     const existing = await this.repo.liveBoss(region.code, cycleKey);
     if (existing) return existing;
 
-    // Progress carries across a kill: the next boss in the cycle is one tier up.
+    // Progress carries two ways.
+    //
+    // Within a cycle: each kill spawns the next tier up.
+    // Across cycles: a neighbourhood that reached tier 5 last week starts this week at 4 —
+    // progress is kept but re-earned, so a good week is worth repeating rather than banked
+    // forever.
+    //
+    // Both are read at spawn time rather than written by a scheduled job. A weekly cron that
+    // failed one Sunday would silently reset every 행정동 in the country to tier 1.
     const cleared = await this.repo.bestTierCleared(region.code, cycleKey);
-    const tier = cleared + 1;
+    const tier = cleared > 0
+      ? cleared + 1
+      : nextCycleStartTier(await this.repo.bestTierCleared(region.code, previousCycleKey(level, at)));
     const seed = bossSeed(region.code, cycleKey);
     const maxHp = bossMaxHp(tier, 1);
     return this.repo.createBoss({

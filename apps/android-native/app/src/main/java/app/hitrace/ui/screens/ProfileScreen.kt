@@ -18,6 +18,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.launch
+import app.hitrace.data.PrivacyBody
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -124,6 +130,11 @@ fun ProfileScreen(
             RbGhostButton("시즌 패스", Modifier.weight(1f), onClick = onSeason)
         }
 
+        // 동네 보스 기여 순위표에 이름을 낼지. Boss content reveals which neighbourhood somebody
+        // runs in — not their address, but more than some people want public — so it has to be
+        // refusable, and refusing must not remove them from the fight.
+        BossPrivacyRow()
+
         // Only appears if the app actually died last time. Writing the trace to disk is useless
         // unless someone can see that it happened and tell us.
         val ctx = LocalContext.current
@@ -174,5 +185,50 @@ private fun Mini(label: String, value: String) {
     Column {
         Text(label, color = Rb.Muted, fontSize = 10.sp)
         Text(value, color = Rb.Text2, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun BossPrivacyRow() {
+    val scope = rememberCoroutineScope()
+    var state by remember { mutableStateOf<app.hitrace.data.BossPrivacy?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        state = runCatching { ApiClient.api.bossPrivacy() }.getOrNull()
+    }
+    val current = state ?: return
+    if (!current.available) return
+
+    RbCard {
+        Row(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("보스 순위표에 이름 공개", color = Rb.Text2, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (current.anonymous) "'익명의 러너'로 표시됩니다. 기여는 그대로 반영됩니다."
+                    else "동네 보스 기여 순위표에 러너 이름이 표시됩니다.",
+                    color = Rb.Muted, fontSize = 11.sp,
+                )
+            }
+            Switch(
+                checked = !current.anonymous,
+                enabled = !busy,
+                onCheckedChange = { show ->
+                    busy = true
+                    scope.launch {
+                        runCatching { ApiClient.api.setBossPrivacy(PrivacyBody(anonymous = !show)) }
+                            .onSuccess { state = it.copy(available = true) }
+                        busy = false
+                    }
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Rb.Screen,
+                    checkedTrackColor = Rb.Gold,
+                    uncheckedTrackColor = Rb.Surface4,
+                ),
+            )
+        }
     }
 }

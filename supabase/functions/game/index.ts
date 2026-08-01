@@ -98,6 +98,10 @@ Deno.serve(async (req) => {
       const at = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
       return json(await svc.bossStatus(userId, level, at));
     }
+    if (req.method === 'GET' && path === '/boss/privacy') return json(await svc.bossPrivacy(userId));
+    if (req.method === 'POST' && path === '/boss/privacy') {
+      return json(await svc.setBossPrivacy(userId, body.anonymous === true));
+    }
     if (req.method === 'POST' && seg[0] === 'swords' && seg[2] === 'awaken') {
       return json(await svc.awakenSword(userId, seg[1]!));
     }

@@ -42,7 +42,7 @@ export {
   streakFactor,
 } from './boss/damage.js';
 export type { DamageInput, DamageBreakdown, RegionShare } from './boss/damage.js';
-export { bossName, bossSeed, weekKey, monthKey } from './boss/naming.js';
+export { bossName, bossSeed, weekKey, monthKey, previousCycleKey } from './boss/naming.js';
 export { distributeRewards } from './boss/rewards.js';
 export type { Contribution, Payout } from './boss/rewards.js';
 export { awakenCost, awakenBonus, applyAwakening, maxAwakenStage } from './boss/awaken.js';

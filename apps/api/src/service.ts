@@ -297,6 +297,18 @@ export class GameService {
     return service.status(region.code, level, Date.now());
   }
 
+  /** Leaderboard visibility. Reads as "이름 공개" in the app, stored as its opposite. */
+  async bossPrivacy(userId: string) {
+    if (!this.repo.boss) return { anonymous: false, available: false };
+    return { anonymous: await this.repo.boss.isAnonymous(userId), available: true };
+  }
+
+  async setBossPrivacy(userId: string, anonymous: boolean) {
+    if (!this.repo.boss) throw new ServiceError('boss_unavailable', 503);
+    await this.repo.boss.setAnonymous(userId, anonymous);
+    return { anonymous };
+  }
+
   async awakenSword(userId: string, swordId: string) {
     const service = this.bossService();
     if (!service) throw new ServiceError('boss_unavailable', 503);

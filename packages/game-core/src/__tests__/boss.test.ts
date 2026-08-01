@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bossMaxHp, joinBoss, nextCycleStartTier } from '../boss/hp.js';
 import { computeDamage, allocateRegions, swordFactor, paceFactor } from '../boss/damage.js';
-import { bossName, bossSeed, weekKey, monthKey } from '../boss/naming.js';
+import { bossName, bossSeed, weekKey, monthKey, previousCycleKey } from '../boss/naming.js';
 import { distributeRewards } from '../boss/rewards.js';
 import { awakenCost, awakenBonus, applyAwakening, maxAwakenStage } from '../boss/awaken.js';
 import { BALANCE } from '../config/balance.js';
@@ -45,6 +45,20 @@ describe('boss HP', () => {
     expect(nextCycleStartTier(5)).toBe(4);
     expect(nextCycleStartTier(1)).toBe(1);
     expect(nextCycleStartTier(0)).toBe(1);
+  });
+
+  it('the previous cycle key is one week / one month back', () => {
+    // What makes the carry-over derivable instead of needing a scheduled job.
+    const wed = Date.UTC(2026, 7, 5, 3); // 2026-08-05 12:00 KST
+    expect(previousCycleKey('dong', wed)).toBe(weekKey(wed - 7 * 86_400_000));
+    expect(previousCycleKey('dong', wed)).not.toBe(weekKey(wed));
+    expect(previousCycleKey('gu', wed)).toBe('2026-07');
+  });
+
+  it('crosses a year boundary without inventing a week', () => {
+    const jan2 = Date.UTC(2027, 0, 2, 3);
+    expect(previousCycleKey('dong', jan2)).toMatch(/^2026-W\d\d$/);
+    expect(previousCycleKey('gu', Date.UTC(2027, 0, 15, 3))).toBe('2026-12');
   });
 });
 

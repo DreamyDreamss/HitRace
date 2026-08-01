@@ -96,6 +96,15 @@ export interface BossRepo {
     rows: Array<{ code: string; level: 'dong' | 'gu'; distanceKm: number; damage: number }>,
   ): Promise<void>;
 
+  /**
+   * Whether this runner appears by name on contribution boards.
+   *
+   * On by default — an empty leaderboard is a dead feature — but boss content reveals which
+   * neighbourhood somebody runs in, and that has to be refusable.
+   */
+  isAnonymous(userId: string): Promise<boolean>;
+  setAnonymous(userId: string, anonymous: boolean): Promise<void>;
+
   grantManaStone(userId: string, amount: number): Promise<number>;
   getManaStone(userId: string): Promise<number>;
 

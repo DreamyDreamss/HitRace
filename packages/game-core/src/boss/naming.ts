@@ -54,6 +54,23 @@ export function weekKey(atMs: number, tzOffsetMinutes = 9 * 60): string {
   return `${target.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
+/**
+ * The key for the cycle before [atMs]'s.
+ *
+ * Lets a boss's starting tier be *derived* from last cycle's result instead of being written by a
+ * scheduled job. A weekly cron that quietly fails on one Sunday would silently reset every
+ * neighbourhood in the country to tier 1, and nobody would find out until Monday.
+ */
+export function previousCycleKey(level: 'dong' | 'gu', atMs: number): string {
+  return level === 'dong' ? weekKey(atMs - 7 * 86_400_000) : monthKey(startOfMonth(atMs) - 86_400_000);
+}
+
+/** First instant of [atMs]'s month, in KST. */
+function startOfMonth(atMs: number, tzOffsetMinutes = 9 * 60): number {
+  const d = new Date(atMs + tzOffsetMinutes * 60_000);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) - tzOffsetMinutes * 60_000;
+}
+
 /** Month key, e.g. `2026-08`. Gu raids settle monthly. */
 export function monthKey(atMs: number, tzOffsetMinutes = 9 * 60): string {
   const d = new Date(atMs + tzOffsetMinutes * 60_000);

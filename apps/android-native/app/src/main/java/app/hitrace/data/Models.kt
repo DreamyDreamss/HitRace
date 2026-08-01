@@ -198,6 +198,12 @@ data class BossHit(
 data class BossOutcome(val hits: List<BossHit> = emptyList(), val manaStone: Int = 0)
 
 @Serializable
+data class BossPrivacy(val anonymous: Boolean = false, val available: Boolean = false)
+
+@Serializable
+data class PrivacyBody(val anonymous: Boolean)
+
+@Serializable
 data class AwakenResult(val stage: Int = 0, val cost: AwakenCost = AwakenCost())
 
 @Serializable

@@ -26,6 +26,12 @@ interface HitRaceApi {
         @Query("lng") lng: Double? = null,
     ): BossStatus
 
+    @GET("boss/privacy")
+    suspend fun bossPrivacy(): BossPrivacy
+
+    @POST("boss/privacy")
+    suspend fun setBossPrivacy(@Body body: PrivacyBody): BossPrivacy
+
     @POST("swords/{id}/awaken")
     suspend fun awaken(@Path("id") id: String): AwakenResult
 

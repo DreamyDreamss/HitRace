@@ -224,6 +224,15 @@ export class PgBossRepo implements BossRepo {
     );
   }
 
+  async isAnonymous(userId: string) {
+    const r = await this.q('SELECT boss_anonymous FROM users WHERE id=$1', [userId]);
+    return !!r.rows[0]?.boss_anonymous;
+  }
+
+  async setAnonymous(userId: string, anonymous: boolean) {
+    await this.q('UPDATE users SET boss_anonymous=$2 WHERE id=$1', [userId, anonymous]);
+  }
+
   async grantManaStone(userId: string, amount: number) {
     const r = await this.q(
       `INSERT INTO wallets (user_id, currency, balance) VALUES ($1,'manaStone',GREATEST(0,$2))
