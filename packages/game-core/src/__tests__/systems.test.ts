@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateRun } from '../anticheat.js';
+import { pathLengthMeters } from '../geo.js';
 import { upgradeCost, upgradeSuccessChance, streakBonus, nextStreak, applyUpgrade, dismantleYield, runOreReward, runTicketReward, grantCapped } from '../economy.js';
 import { pull, pullMany } from '../gacha.js';
 import { simulateCombat } from '../combat.js';
@@ -43,6 +44,48 @@ describe('anti-cheat validateRun', () => {
     const v = validateRun(synthRun({ distanceKm: 5, teleportAt: 0.5 }));
     expect(v.track.cadence).toHaveLength(v.track.points.length);
     expect(v.track.heartRate).toHaveLength(v.track.points.length);
+  });
+  it('does not bank the distance across a blackout', () => {
+    // Tunnel: 5 minutes of nothing, reappearing 2 km down the line. The straight line between
+    // those two fixes was not run, so it must not become distance (or ore).
+    const track = synthRun({ distanceKm: 5 });
+    const mid = Math.floor(track.points.length / 2);
+    const jumped = track.points.slice(0, mid).concat(
+      track.points.slice(mid).map((p, i) => ({
+        ...p,
+        lat: p.lat + 0.018, // ~2 km sideways
+        t: p.t + 300_000,
+        ...(i === 0 ? { gap: true } : {}),
+      })),
+    );
+    const withGap = validateRun({ ...track, points: jumped });
+    expect(withGap.ok).toBe(true); // not a teleport — it is declared as a gap
+    // The same jump *without* the marker is what a subway ride looks like.
+    const unmarked = jumped.map((p) => { const { gap: _gap, ...rest } = p; return rest; });
+    const noMarker = validateRun({ ...track, points: unmarked });
+    const gapMeters = pathLengthMeters(unmarked) - pathLengthMeters(jumped);
+    expect(gapMeters).toBeGreaterThan(1500);
+    expect(noMarker.ok).toBe(true); // 2km in 5min is only 6.7 m/s — anti-cheat can't see it
+  });
+  it('does not call a fast runner a vehicle', () => {
+    // 3'20"/km — elite but human — with a short burst of noisy fixes. Counting samples used to
+    // flag this; counting distance does not.
+    const track = synthRun({ distanceKm: 5, paceSecPerKm: 200 });
+    for (let i = 20; i < 26; i++) track.points[i]!.lat += 0.0004; // ~45 m of jitter
+    const v = validateRun(track);
+    expect(v.reasons).not.toContain('vehicle_suspected');
+  });
+  it('still calls an actual vehicle a vehicle', () => {
+    // Most of the ground covered at ~20 m/s (72 km/h).
+    const n = 200;
+    const t0 = Date.now() - 1_200_000;
+    const points = Array.from({ length: n }, (_, i) => ({
+      lat: 37.5285 + (i * 120) / 111_320, // 120 m every 6 s = 20 m/s
+      lng: 126.933,
+      t: t0 + i * 6000,
+    }));
+    const v = validateRun({ points });
+    expect(v.reasons).toContain('vehicle_suspected');
   });
   it('carries the repeat index through', () => {
     expect(validateRun(synthRun(), { priorRepeats: 2 }).repeatIndex).toBe(2);

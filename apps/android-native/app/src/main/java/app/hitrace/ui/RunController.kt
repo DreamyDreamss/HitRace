@@ -3,6 +3,7 @@ package app.hitrace.ui
 import android.content.Context
 import app.hitrace.data.RunStatus
 import app.hitrace.data.RunTracker
+import app.hitrace.data.StepCounter
 import app.hitrace.data.TrackDto
 import app.hitrace.service.RunTrackingService
 
@@ -24,6 +25,8 @@ class RunController(private val context: Context) {
     /** Stops tracking and returns the finished track for submission. */
     fun finish(): TrackDto {
         RunTracker.setStatus(RunStatus.FINISHED)
+        // Read the cadence before stopping: stopping unregisters the sensor.
+        RunTracker.setCadence(StepCounter.samplesFor(RunTracker.points.value))
         RunTrackingService.send(context, RunTrackingService.ACTION_STOP)
         return RunTracker.track()
     }

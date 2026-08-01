@@ -20,9 +20,10 @@ object RunMath {
         return 2 * EARTH_R * asin(min(1.0, sqrt(h)))
     }
 
+    /** Total distance, skipping blackout legs so the live figure matches what the server scores. */
     fun pathMeters(pts: List<GpsPointDto>): Double {
         var d = 0.0
-        for (i in 1 until pts.size) d += haversine(pts[i - 1], pts[i])
+        for (i in 1 until pts.size) if (!pts[i].gap) d += haversine(pts[i - 1], pts[i])
         return d
     }
 

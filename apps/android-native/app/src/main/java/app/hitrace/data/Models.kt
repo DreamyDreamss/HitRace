@@ -95,7 +95,17 @@ data class RankingRow(val rank: Int, val handle: String, val cp: Int, val rankRp
 data class Rewards(val ore: Int = 0, val oreCapped: Boolean = false, val forgeTicket: Int = 0)
 
 @Serializable
-data class GpsPointDto(val lat: Double, val lng: Double, val ele: Double? = null, val t: Long)
+data class GpsPointDto(
+    val lat: Double,
+    val lng: Double,
+    val ele: Double? = null,
+    val t: Long,
+    /**
+     * Recording resumed here after a blackout — the straight line back to the previous point was
+     * not necessarily run, so neither client nor server counts it as distance.
+     */
+    val gap: Boolean = false,
+)
 
 @Serializable
 data class TrackDto(

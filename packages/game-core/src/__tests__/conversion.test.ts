@@ -3,6 +3,23 @@ import { deriveMetrics, deriveShape, deriveStats, computeForgeScore, rarityFromS
 import { forgeSword } from '../forge.js';
 import { synthRun } from './fixtures.js';
 
+
+describe('missing sensors are absent, not zero', () => {
+  it('a run without heart rate gets a neutral magic rather than the floor', () => {
+    const withHr = synthRun({ distanceKm: 5 });
+    const noHr = { ...withHr, heartRate: undefined };
+    const a = deriveStats(deriveMetrics(withHr));
+    const b = deriveStats(deriveMetrics(noHr));
+    // Not the floor — a runner without a watch must not be handed the worst possible stat.
+    expect(b.magic).toBeGreaterThan(0);
+    expect(Math.abs(b.magic - a.magic)).toBeLessThan(a.magic); // same order of magnitude
+  });
+  it('a run without cadence gets a neutral durability', () => {
+    const noCadence = { ...synthRun({ distanceKm: 5 }), cadence: undefined };
+    expect(deriveStats(deriveMetrics(noCadence)).durability).toBeGreaterThan(0);
+  });
+});
+
 describe('deriveMetrics', () => {
   it('measures distance and duration from the track', () => {
     const m = deriveMetrics(synthRun({ distanceKm: 5, paceSecPerKm: 330 }));

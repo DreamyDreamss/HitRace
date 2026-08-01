@@ -26,12 +26,38 @@ object RunTracker {
     private val _simulated = MutableStateFlow(false)
     val simulated: StateFlow<Boolean> = _simulated.asStateFlow()
 
+    /**
+     * The GPS is reporting, but the fixes are too poor to record. Without this the runner just
+     * watches the distance sit at 0.00 with no idea why — and the filter is *supposed* to drop
+     * those fixes, so it isn't an error state, only one worth naming.
+     */
+    private val _weakSignal = MutableStateFlow(false)
+    val weakSignal: StateFlow<Boolean> = _weakSignal.asStateFlow()
+
+    private var consecutiveRejects = 0
+
+    /**
+     * The run was auto-paused because the movement stopped looking like running. Said out loud
+     * so an auto-pause is never mistaken for the app failing.
+     */
+    private val _vehiclePaused = MutableStateFlow(false)
+    val vehiclePaused: StateFlow<Boolean> = _vehiclePaused.asStateFlow()
+
+    fun noteVehiclePause() { _vehiclePaused.value = true }
+
+    fun clearVehiclePause() { _vehiclePaused.value = false }
+
     /** Wall-clock start, used only until two points exist (then the point timeline wins). */
     @Volatile var startMs: Long = 0L
         private set
 
     fun begin(simulated: Boolean) {
         _points.value = emptyList()
+        _vehiclePaused.value = false
+        cadenceSamples = emptyList()
+        _cadenceNow.value = 0.0
+        consecutiveRejects = 0
+        _weakSignal.value = false
         _simulated.value = simulated
         _gpsOk.value = simulated
         startMs = System.currentTimeMillis()
@@ -40,13 +66,27 @@ object RunTracker {
 
     fun add(point: GpsPointDto) {
         _gpsOk.value = true
+        consecutiveRejects = 0
+        if (_weakSignal.value) _weakSignal.value = false
         _points.value = _points.value + point
+    }
+
+    /** A fix arrived but the filter rejected it — real signal, unusable quality. */
+    fun noteFix() {
+        _gpsOk.value = true
+        // ~10 fixes at 1-2s apart is 10-20 seconds of nothing recorded; that is worth saying.
+        if (++consecutiveRejects >= 10) _weakSignal.value = true
     }
 
     fun setStatus(status: RunStatus) { _status.value = status }
 
     fun clear() {
         _points.value = emptyList()
+        _vehiclePaused.value = false
+        cadenceSamples = emptyList()
+        _cadenceNow.value = 0.0
+        consecutiveRejects = 0
+        _weakSignal.value = false
         _status.value = RunStatus.IDLE
         _gpsOk.value = false
         _simulated.value = false
@@ -62,14 +102,32 @@ object RunTracker {
         return RunMath.metrics(pts)
     }
 
-    /** The finished track, ready to submit. Cadence/HR are synthesised (no sensor on this build). */
+    /**
+     * Measured cadence, one sample per point. Empty when the device has no step detector or the
+     * permission was refused — the server then scores without it rather than being told a
+     * number nobody measured.
+     */
+    @Volatile
+    private var cadenceSamples: List<Double> = emptyList()
+
+    fun setCadence(samples: List<Double>) { cadenceSamples = samples }
+
+    private val _cadenceNow = MutableStateFlow(0.0)
+    /** Live cadence for the running screen; 0 when unmeasured. */
+    val cadenceNow: StateFlow<Double> = _cadenceNow.asStateFlow()
+
+    fun setCadenceNow(spm: Double) { _cadenceNow.value = spm }
+
+    /**
+     * The finished track, ready to submit.
+     *
+     * Cadence is sent only if it was actually measured, and heart rate is not sent at all — this
+     * build has no source for it. Both used to be synthesised here, which meant the server was
+     * deriving a sword's durability from a sine wave.
+     */
     fun track(): TrackDto {
         val pts = _points.value
-        return TrackDto(
-            points = pts,
-            cadence = pts.indices.map { 170.0 + kotlin.math.sin(it * 0.6) * 3 },
-            heartRate = pts.indices.map { if (pts.isNotEmpty() && it.toDouble() / pts.size < 0.65) 152.0 else 120.0 },
-            maxHeartRate = 190,
-        )
+        val cadence = cadenceSamples.takeIf { it.size == pts.size && it.any { v -> v > 0 } }
+        return TrackDto(points = pts, cadence = cadence, heartRate = null)
     }
 }

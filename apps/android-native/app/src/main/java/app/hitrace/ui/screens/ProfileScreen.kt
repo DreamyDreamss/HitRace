@@ -18,6 +18,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hitrace.AppViewModel
 import app.hitrace.data.ApiClient
+import app.hitrace.data.CrashReporter
 import app.hitrace.data.RunMath
 import app.hitrace.ui.rememberLoad
 import app.hitrace.ui.theme.Rb
@@ -116,6 +122,29 @@ fun ProfileScreen(
         Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             RbGhostButton("명검 도감", Modifier.weight(1f), onClick = onCodex)
             RbGhostButton("시즌 패스", Modifier.weight(1f), onClick = onSeason)
+        }
+
+        // Only appears if the app actually died last time. Writing the trace to disk is useless
+        // unless someone can see that it happened and tell us.
+        val ctx = LocalContext.current
+        var crash by remember { mutableStateOf(CrashReporter.lastCrash(ctx)) }
+        crash?.let { text ->
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Rb.Surface2)
+                    .border(1.dp, Rb.Line, RoundedCornerShape(14.dp)).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text("지난 실행에서 앱이 종료되었습니다", color = Rb.Text2, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text.lineSequence().drop(5).firstOrNull { it.isNotBlank() }?.take(120) ?: "",
+                    color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 10.sp,
+                )
+                LinkText(
+                    "지우기",
+                    onClick = { CrashReporter.clear(ctx); crash = null },
+                    color = Rb.Muted, fontSize = 12.sp,
+                )
+            }
         }
 
         Button(

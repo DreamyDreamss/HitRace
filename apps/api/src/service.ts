@@ -98,6 +98,26 @@ export class GameService {
     const user = await this.repo.getUser(userId);
     if (!user) throw new ServiceError('no_user', 404);
 
+    // A retry of an upload that actually succeeded must not forge a second sword or burn a
+    // second slot of the daily cap. The track is byte-identical on retry, so its first sample's
+    // timestamp identifies the run: if we already have it, hand back what we stored.
+    const startedAt = track.points?.[0]?.t;
+    if (startedAt != null) {
+      const existing = await this.repo.findRunByStart(userId, startedAt);
+      if (existing) {
+        const sword = existing.swordId ? await this.repo.getSword(existing.swordId) : undefined;
+        return {
+          run: existing,
+          sword,
+          metrics: undefined,
+          rewards: { ore: 0, forgeTicket: 0 },
+          records: undefined,
+          weeklyGoal: undefined,
+          duplicate: true as const,
+        };
+      }
+    }
+
     // The fingerprint is taken on the cleaned track so one bad fix can't move a familiar course
     // to a new one. Validation gets the **raw** track — it has to see the outliers to judge
     // whether they are sensor noise or a fabricated route — and hands back the cleaned version

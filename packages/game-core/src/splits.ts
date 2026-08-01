@@ -2,7 +2,7 @@
 // Pure geometry + time; no I/O. Interpolates across the sample that crosses each
 // kilometre mark so a 1 km split is exactly 1 km, not "the sample nearest 1 km".
 
-import { haversine } from './geo.js';
+import { haversine, segmentMeters } from './geo.js';
 import type { GpsPoint } from './types.js';
 
 export interface Split {
@@ -45,7 +45,7 @@ export function computeSplits(points: GpsPoint[]): Split[] {
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1]!;
     const b = points[i]!;
-    let legMeters = haversine(a, b);
+    let legMeters = segmentMeters(a, b);
     const legMs = b.t - a.t;
     if (a.ele != null && b.ele != null && b.ele > a.ele) segGain += b.ele - a.ele;
 

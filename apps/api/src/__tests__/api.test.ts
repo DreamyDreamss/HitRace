@@ -105,6 +105,32 @@ describe('runs → forge', () => {
     expect(JSON.parse(res.body).error).toContain('gps_jump');
   });
 
+  it('re-submitting the same run returns the stored one instead of forging twice', async () => {
+    // Own account: this test must not spend the shared demo user's daily forge slots.
+    const login = await app.inject({ method: 'POST', url: '/auth/dev/login', payload: { handle: 'retrier' } });
+    const h = { authorization: `Bearer ${JSON.parse(login.body).token}` };
+    const track = synthRun(5, 330, 'out_and_back');
+
+    const first = await app.inject({ method: 'POST', url: '/runs', headers: h, payload: { track, forge: true } });
+    expect(first.statusCode).toBe(200);
+    const a = JSON.parse(first.body);
+    expect(a.sword).toBeTruthy();
+
+    const before = JSON.parse((await app.inject({ method: 'GET', url: '/wallet', headers: h })).body);
+    const second = await app.inject({ method: 'POST', url: '/runs', headers: h, payload: { track, forge: true } });
+    expect(second.statusCode).toBe(200);
+    const b = JSON.parse(second.body);
+    expect(b.duplicate).toBe(true);
+    expect(b.run.id).toBe(a.run.id);
+    expect(b.sword.id).toBe(a.sword.id);
+    // No second payout, and the daily forge cap was not charged again.
+    const after = JSON.parse((await app.inject({ method: 'GET', url: '/wallet', headers: h })).body);
+    expect(after.ore).toBe(before.ore);
+    const list = JSON.parse((await app.inject({ method: 'GET', url: '/runs', headers: h })).body);
+    expect(list.filter((r: any) => r.id === a.run.id)).toHaveLength(1);
+    expect(JSON.parse((await app.inject({ method: 'GET', url: '/swords', headers: h })).body)).toHaveLength(1);
+  });
+
   it('forges a sword from a valid run and grants ore + ticket', async () => {
     const walletBefore = JSON.parse((await app.inject({ method: 'GET', url: '/wallet', headers: H() })).body);
     const res = await app.inject({ method: 'POST', url: '/runs', headers: H(), payload: { track: synthRun(8, 300, 'out_and_back'), forge: true } });

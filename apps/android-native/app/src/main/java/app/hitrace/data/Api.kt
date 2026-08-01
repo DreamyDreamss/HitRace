@@ -12,6 +12,7 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import java.util.concurrent.TimeUnit
 
 interface HitRaceApi {
     @POST("auth/dev/login")
@@ -127,8 +128,15 @@ object ApiClient {
         chain.proceed(req)
     }
 
+    // Without these a stalled server leaves the forge button on "주조 중…" forever — OkHttp's
+    // defaults are 10s connect and *no* read/write/call ceiling at all.
     private val client = OkHttpClient.Builder()
         .addInterceptor(authInterceptor)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     private fun base(): String {

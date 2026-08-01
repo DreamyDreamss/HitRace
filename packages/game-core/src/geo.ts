@@ -20,10 +20,18 @@ function toRad(d: number): number {
   return (d * Math.PI) / 180;
 }
 
-/** Total path length in metres. */
+/**
+ * Distance of one leg, in metres. A leg *into* a gap point spans a recording blackout rather
+ * than travel, so it contributes nothing — see `GpsPoint.gap`.
+ */
+export function segmentMeters(a: GpsPoint, b: GpsPoint): number {
+  return b.gap ? 0 : haversine(a, b);
+}
+
+/** Total path length in metres, excluding blackout legs. */
 export function pathLengthMeters(pts: GpsPoint[]): number {
   let d = 0;
-  for (let i = 1; i < pts.length; i++) d += haversine(pts[i - 1]!, pts[i]!);
+  for (let i = 1; i < pts.length; i++) d += segmentMeters(pts[i - 1]!, pts[i]!);
   return d;
 }
 

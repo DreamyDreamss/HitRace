@@ -64,6 +64,8 @@ export function deriveMetrics(track: RunTrack): RunMetrics {
     avgCadence,
     cadenceStability,
     hrZoneFraction,
+    hasHeartRate: (track.heartRate ?? []).length > 0,
+    hasCadence: avgCadence > 0,
     isRoundTrip,
     isClosedLoop,
     curviness: c,
@@ -116,8 +118,13 @@ export function deriveStats(m: RunMetrics): Stats {
       ? Math.round(clamp(s.durability.base - m.cadenceStability * s.durability.stabilityPenaltyPerCv, s.durability.floor, s.durability.base))
       : Math.round((s.durability.base + s.durability.floor) / 2);
 
-  // Magic ← HR-zone fraction.
-  const magic = Math.round(clamp(s.magic.floor + m.hrZoneFraction * s.magic.maxFromZone, s.magic.floor, s.magic.floor + s.magic.maxFromZone));
+  // Magic ← HR-zone fraction. Without a heart-rate source (which is most phones) this is not
+  // "zero time in zone", it is "unknown" — so it takes the midpoint, the same way durability
+  // does when there is no cadence. Scoring absence as zero would quietly make every sword
+  // forged without a watch weaker than every sword forged before this was measured honestly.
+  const magic = m.hasHeartRate
+    ? Math.round(clamp(s.magic.floor + m.hrZoneFraction * s.magic.maxFromZone, s.magic.floor, s.magic.floor + s.magic.maxFromZone))
+    : Math.round(s.magic.floor + s.magic.maxFromZone / 2);
 
   return { sharpness, weight, durability, magic };
 }

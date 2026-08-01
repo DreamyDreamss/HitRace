@@ -12,6 +12,12 @@ export const BALANCE = {
     minPlausiblePaceSecPerKm: 180,
     /** GPS jump: > this speed (m/s) between samples flags a teleport. ~10 m/s ≈ 36 km/h. */
     maxPlausibleSpeedMps: 10,
+    /**
+     * Share of the run's *distance* (not its sample count) that may be above running speed
+     * before it's called a vehicle. Set high on purpose: shortening a real run is worse than
+     * letting the odd bus ride through, and noisy fixes cluster.
+     */
+    vehicleDistanceShare: 0.3,
     /** Max swords forge-able per calendar day. */
     maxForgesPerDay: 2,
     /** Score decay starts at this repeat index (0-based → 3rd run). */

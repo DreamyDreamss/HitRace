@@ -181,6 +181,11 @@ export class MemoryRepo implements Repo {
   async getRun(userId: string, runId: string) {
     return this.runs.find((r) => r.id === runId && r.userId === userId);
   }
+  async findRunByStart(userId: string, startedAtMs: number) {
+    return this.runs.find(
+      (r) => r.userId === userId && r.startedAt === startedAtMs && r.status !== 'rejected',
+    );
+  }
   async countForgesOnDay(userId: string, dayStartMs: number) {
     return this.runs.filter((r) => r.userId === userId && r.status === 'forged' && r.createdAt >= dayStartMs).length;
   }

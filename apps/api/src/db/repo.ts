@@ -134,6 +134,12 @@ export interface Repo {
   /** Newest first. Summaries only — the route comes from getRun. */
   listRuns(userId: string, limit: number): Promise<RunRecord[]>;
   getRun(userId: string, runId: string): Promise<RunRecord | undefined>;
+  /**
+   * The run this user already stored that began at exactly `startedAtMs`, if any.
+   * A retried upload carries the identical track, so its first sample's timestamp identifies it
+   * — that is what makes submitting twice safe.
+   */
+  findRunByStart(userId: string, startedAtMs: number): Promise<RunRecord | undefined>;
   countForgesOnDay(userId: string, dayStartMs: number): Promise<number>;
   countRunsForCourse(userId: string, courseHash: string): Promise<number>;
   runStats(userId: string): Promise<RunStats>;

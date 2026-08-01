@@ -125,6 +125,7 @@ fun MainScaffold(vm: AppViewModel, me: MeResp) {
                         onStats = { nav.navigate(Routes.RUN_STATS) },
                         onHistory = { nav.navigate(Routes.RUN_HISTORY) },
                         onRun = { nav.navigate(Routes.runDetail(it)) },
+                        onRecovered = { nav.navigate(Routes.SUMMARY) },
                     )
                 }
                 composable(Routes.COLLECTION) {

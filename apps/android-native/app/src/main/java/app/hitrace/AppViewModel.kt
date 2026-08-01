@@ -11,7 +11,9 @@ import app.hitrace.data.ApiClient
 import app.hitrace.data.Auth
 import app.hitrace.data.LoginBody
 import app.hitrace.data.MeResp
+import app.hitrace.data.PendingRunStore
 import app.hitrace.data.RankingRow
+import app.hitrace.data.RunUploader
 import app.hitrace.data.RefreshBody
 import app.hitrace.data.SupabaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +44,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    /** Runs finished offline and still waiting to reach the server. */
+    private val _pendingRuns = MutableStateFlow(0)
+    val pendingRuns: StateFlow<Int> = _pendingRuns
+
     init { bootstrap() }
 
     private fun bootstrap() = viewModelScope.launch {
@@ -50,14 +56,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (saved.isNullOrBlank()) { _auth.value = AuthState.LoggedOut; return@launch }
         Auth.token = saved
         runCatching { ApiClient.api.me() }
-            .onSuccess { _auth.value = AuthState.LoggedIn(it); loadRanking() }
+            .onSuccess { _auth.value = AuthState.LoggedIn(it); loadRanking(); flushPendingRuns() }
             .onFailure {
                 // A Supabase access token only lives an hour — try the refresh token before
                 // dumping the player back to the sign-in screen.
                 val refreshed = refreshSession(prefs[REFRESH])
                 if (refreshed) {
                     runCatching { ApiClient.api.me() }
-                        .onSuccess { me -> _auth.value = AuthState.LoggedIn(me); loadRanking() }
+                        .onSuccess { me -> _auth.value = AuthState.LoggedIn(me); loadRanking(); flushPendingRuns() }
                         .onFailure { _auth.value = AuthState.LoggedOut }
                 } else {
                     _auth.value = AuthState.LoggedOut
@@ -96,12 +102,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 ds.edit { it[TOKEN] = res.token }
             }
             ApiClient.api.me()
-        }.onSuccess { _auth.value = AuthState.LoggedIn(it); loadRanking() }
+        }.onSuccess { _auth.value = AuthState.LoggedIn(it); loadRanking(); flushPendingRuns() }
             .onFailure { _error.value = loginErrorMessage(it) }
     }
 
     fun refresh() = viewModelScope.launch {
         runCatching { ApiClient.api.me() }.onSuccess { _auth.value = AuthState.LoggedIn(it) }
+    }
+
+    /**
+     * Push anything the queue is holding. Called whenever we have just proven we can reach the
+     * server, so a run stranded by a dead signal goes up without the runner chasing it.
+     */
+    fun flushPendingRuns() = viewModelScope.launch {
+        val result = RunUploader.flush(getApplication())
+        _pendingRuns.value = result.remaining
+        if (result.uploaded > 0) {
+            // The wallet and history moved, so whatever is on screen is now stale.
+            runCatching { ApiClient.api.me() }.onSuccess { _auth.value = AuthState.LoggedIn(it) }
+        }
+    }
+
+    fun notePendingRuns() {
+        _pendingRuns.value = PendingRunStore.of(getApplication()).count()
     }
 
     private fun loadRanking() = viewModelScope.launch {

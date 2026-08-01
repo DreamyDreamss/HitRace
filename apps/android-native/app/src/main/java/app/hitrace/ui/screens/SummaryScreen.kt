@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,6 +37,7 @@ import app.hitrace.AppViewModel
 import app.hitrace.data.ApiClient
 import app.hitrace.data.RunBody
 import app.hitrace.data.RunMath
+import app.hitrace.data.PendingRunStore
 import app.hitrace.data.RunSession
 import app.hitrace.data.apiFailure
 import app.hitrace.ui.RouteTrace
@@ -48,6 +50,8 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf<String?>(null) }
+    var queued by remember { mutableStateOf(false) }
+    val ctx = LocalContext.current
 
     if (track == null || track.points.size < 2) {
         Column(Modifier.fillMaxSize().background(Rb.Bg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -70,10 +74,18 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
                 }
                 .onFailure { t ->
                     val f = t.apiFailure()
-                    err = when {
-                        f?.status == 429 -> "오늘 주조 한도(2자루)를 모두 사용했어요."
-                        f?.status == 422 -> rejectionMessage(f.reasons)
-                        else -> "문제가 발생했습니다. 다시 시도해 주세요."
+                    when {
+                        f?.status == 429 -> err = "오늘 주조 한도(2자루)를 모두 사용했어요."
+                        f?.status == 422 -> err = rejectionMessage(f.reasons)
+                        // No answer from the server means the run isn't rejected — it just
+                        // hasn't arrived. Losing an hour of running to a dead signal is not
+                        // acceptable, so it goes on disk and uploads itself later.
+                        f == null -> {
+                            PendingRunStore.of(ctx).add(RunBody(track, forge))
+                            vm.notePendingRuns()
+                            queued = true
+                        }
+                        else -> err = "문제가 발생했습니다. 다시 시도해 주세요."
                     }
                     busy = false
                 }
@@ -121,6 +133,21 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
             }
         }
         if (err != null) Text(err!!, color = Rb.Red, fontSize = 12.5.sp)
+        if (queued) {
+            Box(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Rb.Surface2)
+                    .border(1.dp, Rb.Line, RoundedCornerShape(14.dp)).padding(14.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("기기에 저장했습니다", color = Rb.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "서버에 연결되지 않아 이 러닝을 폰에 보관했습니다. 연결되면 자동으로 전송되고, " +
+                            "그때 검도 함께 주조됩니다.",
+                        color = Rb.Text3, fontSize = 12.sp,
+                    )
+                }
+            }
+        }
         budget?.takeIf { !it.exhausted }?.let {
             Text("오늘 주조 ${it.today}/${it.max}", color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
         }
@@ -131,6 +158,17 @@ fun SummaryScreen(vm: AppViewModel, onForged: () -> Unit, onSavedOnly: () -> Uni
             )
         }
         Spacer(Modifier.height(4.dp))
+        if (queued) {
+            // Nothing more to decide here — the run is safe and the choice is already recorded.
+            Button(
+                onClick = onSavedOnly,
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen),
+            ) { Text("확인", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+            Spacer(Modifier.height(8.dp))
+            return@Column
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedBtn("기록만 저장", Modifier.weight(1f)) { if (!busy) submit(false) }
             Button(

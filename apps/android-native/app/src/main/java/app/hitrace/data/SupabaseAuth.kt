@@ -60,6 +60,12 @@ object SupabaseAuth {
                 .build()
             chain.proceed(req)
         }
+        // Sign-in blocks the whole app behind a spinner; it must be able to give up.
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .callTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     val api: SupabaseAuthApi by lazy {

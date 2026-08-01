@@ -12,6 +12,13 @@ export interface GpsPoint {
   ele?: number;
   /** Unix epoch milliseconds. */
   t: number;
+  /**
+   * This point resumes recording after a blackout (tunnel, dead signal, a long run of unusable
+   * fixes) — the straight line from the previous point is *not* known to have been travelled.
+   * Distance, pace and cheat checks all skip that segment: we would rather undercount a real
+   * run than let a subway ride between two fixes turn into ore.
+   */
+  gap?: boolean;
 }
 
 /** Raw sensor stream for one run, as submitted by the client. Trusted only after validateRun(). */
@@ -37,8 +44,12 @@ export interface RunMetrics {
   avgCadence: number;
   /** Coefficient of variation of cadence (0 = perfectly steady). */
   cadenceStability: number;
-  /** Fraction (0..1) of time spent in the target HR zone. */
+  /** Fraction (0..1) of time spent in the target HR zone. Meaningless when [hasHeartRate] is false. */
   hrZoneFraction: number;
+  /** Whether the run carried heart-rate samples at all (most phones have no source for them). */
+  hasHeartRate: boolean;
+  /** Whether the run carried measured cadence (a step detector, not an invented figure). */
+  hasCadence: boolean;
   /** True if the route returns near its start (out-and-back or loop). */
   isRoundTrip: boolean;
   /** True if the path forms a closed loop (start≈end AND encloses area). */

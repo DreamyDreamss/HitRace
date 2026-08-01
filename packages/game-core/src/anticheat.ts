@@ -45,7 +45,9 @@ export function sanitizeTrack(track: RunTrack): SanitizeResult {
     // dt accumulates across dropped points, so a runner who really covered the ground while
     // the receiver was confused is not punished for the gap.
     const dt = (p.t - last.t) / 1000;
-    const implausible = dt > 0 && haversine(last, p) / dt > ceiling;
+    // A gap point declares its own discontinuity — judging it by speed would drop every
+    // recovery from a tunnel as if it were a teleport.
+    const implausible = !p.gap && dt > 0 && haversine(last, p) / dt > ceiling;
     if (implausible) {
       dropped++;
       currentRun++;
@@ -107,17 +109,31 @@ export function validateRun(track: RunTrack, opts: ValidateOptions = {}): RunVal
   }
 
   // Per-segment vehicle detection, on the surviving points.
-  let vehicleLikeSegments = 0;
+  //
+  // Judged over *distance*, not sample count. Counting samples punishes exactly the wrong
+  // people: fixes arrive on a timer, so a fast runner produces more short segments than a slow
+  // one, and a single stretch of noisy fixes can trip the ratio while contributing almost no
+  // ground. The question that matters is what share of the run was covered at impossible speed.
+  //
+  // The threshold is deliberately conservative. Rundex shipped a stricter version of this check
+  // and had to walk it back after real runners reported losing ~1 km against a Garmin — a run
+  // wrongly shortened is worse than a bus ride occasionally slipping through.
+  let vehicleMeters = 0;
+  let totalMeters = 0;
   for (let i = 1; i < pts.length; i++) {
     const dt = (pts[i]!.t - pts[i - 1]!.t) / 1000;
     if (dt <= 0) {
       reasons.push('non_monotonic_time');
       continue;
     }
-    if (haversine(pts[i - 1]!, pts[i]!) / dt > cfg.maxPlausibleSpeedMps) vehicleLikeSegments++;
+    if (pts[i]!.gap) continue; // blackout leg: no claim is being made about it
+    const m = haversine(pts[i - 1]!, pts[i]!);
+    totalMeters += m;
+    if (m / dt > cfg.maxPlausibleSpeedMps) vehicleMeters += m;
   }
-  // If a large share of the track is above running speed, call it a vehicle.
-  if (vehicleLikeSegments / pts.length > 0.15) reasons.push('vehicle_suspected');
+  if (totalMeters > 0 && vehicleMeters / totalMeters > cfg.vehicleDistanceShare) {
+    reasons.push('vehicle_suspected');
+  }
 
   return {
     ok: reasons.length === 0,

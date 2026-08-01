@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hitrace.data.RunMath
 import app.hitrace.data.RunSession
+import app.hitrace.data.BatteryOptimization
 import app.hitrace.data.RunStatus
 import app.hitrace.data.RunTracker
 import app.hitrace.ui.RouteTrace
@@ -53,13 +55,21 @@ fun RunningScreen(onBack: () -> Unit, onFinish: () -> Unit, onManual: () -> Unit
     val points by RunTracker.points.collectAsState()
     val status by RunTracker.status.collectAsState()
     val gpsOk by RunTracker.gpsOk.collectAsState()
+    val cadence by RunTracker.cadenceNow.collectAsState()
+    val vehiclePaused by RunTracker.vehiclePaused.collectAsState()
+    val weakSignal by RunTracker.weakSignal.collectAsState()
 
     // Location first; then the notification permission the ongoing-run notification needs on 33+.
     val notifyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    // Cadence is a nice-to-have: asked for, but the run starts either way.
+    val stepsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 notifyLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                stepsLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
             }
             run.start()
         }
@@ -70,6 +80,10 @@ fun RunningScreen(onBack: () -> Unit, onFinish: () -> Unit, onManual: () -> Unit
     LaunchedEffect(status) {
         while (status == RunStatus.RUNNING) { delay(1000); tick++ }
     }
+
+    // Asked once per visit to this screen, and again next time if still not granted — a prompt
+    // someone swipes away on their way out the door protects nobody.
+    var batteryWarned by remember { mutableStateOf(BatteryOptimization.isExempt(ctx)) }
 
     val idle = status == RunStatus.IDLE
     val m = remember(points, tick) { RunMath.metrics(points) }
@@ -83,7 +97,44 @@ fun RunningScreen(onBack: () -> Unit, onFinish: () -> Unit, onManual: () -> Unit
             Spacer(Modifier.weight(1f))
             Text("실시간 주조", color = Rb.Text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
-            Text(if (gpsOk) "GPS" else "NO GPS", color = if (gpsOk) Rb.Green else Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+            // Three states, not two: no signal, signal too poor to record, recording.
+            val (label, tone) = when {
+                !gpsOk -> "NO GPS" to Rb.Muted
+                weakSignal -> "GPS 약함" to Rb.Gold
+                else -> "GPS" to Rb.Green
+            }
+            Text(label, color = tone, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+        }
+        if (weakSignal) {
+            Text(
+                "신호가 약해 기록을 잠시 멈췄습니다 — 건물 사이·터널에서 흔합니다. 하늘이 트이면 자동으로 재개됩니다.",
+                color = Rb.Text3, fontSize = 12.sp,
+            )
+        }
+        if (vehiclePaused) {
+            Text(
+                "달리기 속도를 크게 벗어나 기록을 자동으로 멈췄습니다. 다시 뛰기 시작하면 '재개'를 눌러 주세요.",
+                color = Rb.Gold2, fontSize = 12.sp,
+            )
+        }
+        if (!batteryWarned && idle) {
+            Box(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Rb.Surface2)
+                    .border(1.dp, Rb.Line, RoundedCornerShape(12.dp)).padding(14.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("배터리 최적화를 꺼주세요", color = Rb.Text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "일부 기기는 절전 기능이 러닝 기록을 도중에 종료시킵니다. 예외로 등록하면 " +
+                            "화면을 꺼도 끝까지 기록됩니다.",
+                        color = Rb.Text3, fontSize = 12.sp,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LinkText("설정 열기", onClick = { BatteryOptimization.request(ctx) }, fontSize = 13.sp)
+                        LinkText("나중에", onClick = { batteryWarned = true }, color = Rb.Muted, fontSize = 13.sp)
+                    }
+                }
+            }
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -104,6 +155,18 @@ fun RunningScreen(onBack: () -> Unit, onFinish: () -> Unit, onManual: () -> Unit
                     color = if (lap > 0) Rb.Gold2 else Rb.Muted,
                     fontFamily = FontFamily.Monospace, fontSize = 13.sp,
                 )
+            }
+            // Cadence is what the sword's durability is made of, so it belongs on screen while
+            // it is being earned. Absent when the phone has no step detector.
+            if (cadence > 0) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("케이던스", color = Rb.Muted, fontSize = 12.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "${cadence.toInt()} spm",
+                        color = Rb.Text2, fontFamily = FontFamily.Monospace, fontSize = 13.sp,
+                    )
+                }
             }
         }
 

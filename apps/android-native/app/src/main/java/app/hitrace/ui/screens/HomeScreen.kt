@@ -16,21 +16,31 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hitrace.AppViewModel
+import app.hitrace.data.ActiveRunStore
 import app.hitrace.data.MeResp
 import app.hitrace.data.RunMath
+import app.hitrace.data.RunSession
 import app.hitrace.data.Sword
+import app.hitrace.data.TrackDto
 import app.hitrace.data.tierLabel
 import app.hitrace.ui.BladeCanvas
 import app.hitrace.ui.theme.Rb
@@ -44,6 +54,7 @@ fun HomeScreen(
     onStats: () -> Unit = {},
     onHistory: () -> Unit = {},
     onRun: (String) -> Unit = {},
+    onRecovered: () -> Unit = {},
 ) {
     val ranking by vm.ranking.collectAsState()
     // This is a running app first: the week's volume belongs above the fold.
@@ -64,6 +75,10 @@ fun HomeScreen(
             Spacer(Modifier.width(6.dp))
             CurrencyPill(Rb.Gold, me.wallet.forgeTicket)
         }
+
+        // Two ways a run can be stranded, both worth saying out loud before anything else on
+        // this screen: the app died mid-run, or the run finished with no connection.
+        RecoveryNotices(vm, onResume = onRecovered)
 
         // 이번 주 러닝 — tap to open the full stats.
         Card {
@@ -269,6 +284,68 @@ fun StatCard(modifier: Modifier, label: String, value: String, unit: String?, ac
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(value, color = if (accent) Rb.Gold else Rb.Text, fontFamily = FontFamily.Monospace, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 if (unit != null) Text(unit, color = Rb.Muted, fontSize = 11.sp, modifier = Modifier.padding(start = 2.dp, bottom = 3.dp))
+            }
+        }
+    }
+}
+
+/**
+ * A run the app never managed to finish or send. Silence here means the runner discovers days
+ * later that an hour of running is simply gone, so it gets the top of the home screen.
+ */
+@Composable
+private fun RecoveryNotices(vm: AppViewModel, onResume: () -> Unit) {
+    val ctx = LocalContext.current
+    val pending by vm.pendingRuns.collectAsState()
+    var snapshot by remember { mutableStateOf(ActiveRunStore.of(ctx).restorable(System.currentTimeMillis())) }
+
+    LaunchedEffect(Unit) {
+        vm.notePendingRuns()
+        vm.flushPendingRuns()
+    }
+
+    if (pending > 0) {
+        Card {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("전송 대기 중인 러닝 ${pending}건", color = Rb.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "서버에 연결되면 자동으로 올라갑니다. 기록과 검은 그대로 유지됩니다.",
+                    color = Rb.Text3, fontSize = 12.sp,
+                )
+            }
+        }
+    }
+
+    snapshot?.let { snap ->
+        val km = RunMath.pathMeters(snap.points) / 1000.0
+        Card {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("저장되지 않은 러닝", color = Rb.Text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "앱이 예기치 않게 종료되어 %.2fkm 기록이 남아 있습니다.".format(km),
+                    color = Rb.Text3, fontSize = 12.sp,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = {
+                            RunSession.track = TrackDto(points = snap.points)
+                            ActiveRunStore.of(ctx).clear()
+                            snapshot = null
+                            onResume()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen),
+                    ) { Text("이어서 저장", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) }
+                    LinkText(
+                        "버리기",
+                        onClick = {
+                            ActiveRunStore.of(ctx).clear()
+                            snapshot = null
+                        },
+                        color = Rb.Muted,
+                        fontSize = 13.sp,
+                    )
+                }
             }
         }
     }

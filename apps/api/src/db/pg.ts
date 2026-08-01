@@ -126,6 +126,14 @@ export class PgRepo implements Repo {
     return r.rows.map((row: any) => this.rowToRun(row));
   }
 
+  async findRunByStart(userId: string, startedAtMs: number) {
+    const r = await this.q(
+      `SELECT * FROM runs WHERE user_id=$1 AND started_at=$2 AND status<>'rejected' LIMIT 1`,
+      [userId, new Date(startedAtMs)],
+    );
+    return r.rows[0] ? this.rowToRun(r.rows[0]) : undefined;
+  }
+
   async getRun(userId: string, runId: string) {
     const r = await this.q('SELECT * FROM runs WHERE id=$1 AND user_id=$2', [runId, userId]);
     return r.rows[0] ? this.rowToRun(r.rows[0]) : undefined;

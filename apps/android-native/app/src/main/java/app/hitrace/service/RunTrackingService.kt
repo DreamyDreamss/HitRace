@@ -12,15 +12,21 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import app.hitrace.MainActivity
+import app.hitrace.data.ActiveRunStore
 import app.hitrace.data.GpsPointDto
+import app.hitrace.data.GpsSmoother
+import app.hitrace.data.LocationFilter
+import app.hitrace.data.MotionGuard
 import app.hitrace.data.RunMath
 import app.hitrace.data.RunStatus
 import app.hitrace.data.RunTracker
+import app.hitrace.data.StepCounter
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -55,6 +61,9 @@ class RunTrackingService : Service() {
 
         private const val CHANNEL_ID = "run_tracking"
         private const val NOTIFICATION_ID = 42
+        private const val SNAPSHOT_EVERY_MS = 15_000L
+        /** Wake-lock ceiling. Longer than any plausible run, short enough to self-heal. */
+        private const val MAX_RUN_MS = 8L * 60 * 60 * 1000
 
         fun send(context: Context, action: String) {
             val intent = Intent(context, RunTrackingService::class.java).setAction(action)
@@ -66,6 +75,16 @@ class RunTrackingService : Service() {
     private val scope = CoroutineScope(SupervisorJob())
     private val fused by lazy { LocationServices.getFusedLocationProviderClient(this) }
     private var callback: LocationCallback? = null
+
+    // Raw fused fixes are not fit to score a run with: a cold fix lands a kilometre away, and
+    // standing at a crossing drifts enough to accrue distance that becomes ore and forge score.
+    // The gate discards what isn't a person moving; the smoother takes the zig-zag out of what's
+    // left. Both are per-run state, so they reset with each start.
+    private val filter = LocationFilter()
+    private val smoother = GpsSmoother()
+    private val activeRunStore by lazy { ActiveRunStore.of(this) }
+    private val motion = MotionGuard()
+    private var wakeLock: PowerManager.WakeLock? = null
     private var simJob: Job? = null
     private var notifyJob: Job? = null
 
@@ -81,6 +100,8 @@ class RunTrackingService : Service() {
             ACTION_START -> {
                 if (!hasLocationPermission()) { stopSelf(); return START_NOT_STICKY }
                 if (!goForeground(location = true)) { stopSelf(); return START_NOT_STICKY }
+                filter.reset(); smoother.reset(); acquireWakeLock()
+                StepCounter.bind(this); StepCounter.reset(); StepCounter.start(); motion.reset()
                 RunTracker.begin(simulated = false); startLocationUpdates(); startNotifyLoop()
             }
             // The simulation reads no sensors, so it must NOT claim the location type — doing so
@@ -89,9 +110,20 @@ class RunTrackingService : Service() {
                 if (!goForeground(location = false)) { stopSelf(); return START_NOT_STICKY }
                 RunTracker.begin(simulated = true); startSimulation(); startNotifyLoop()
             }
-            ACTION_PAUSE -> { RunTracker.setStatus(RunStatus.PAUSED); stopLocationUpdates() }
-            ACTION_RESUME -> { RunTracker.setStatus(RunStatus.RUNNING); startLocationUpdates() }
-            ACTION_STOP -> { stopEverything(); stopSelf() }
+            // Paused means no fixes to wait for, so let the CPU sleep until resumed.
+            ACTION_PAUSE -> {
+                RunTracker.setStatus(RunStatus.PAUSED); stopLocationUpdates(); releaseWakeLock(); StepCounter.stop()
+            }
+            // Rebase on resume: the runner may have moved (or been driven) while paused, and
+            // chaining across that gap would bank it as distance.
+            ACTION_RESUME -> {
+                filter.rebase(); smoother.reset(); acquireWakeLock(); StepCounter.start()
+                motion.reset(); RunTracker.clearVehiclePause()
+                RunTracker.setStatus(RunStatus.RUNNING); startLocationUpdates()
+            }
+            // Finishing is deliberate: the track is handed to the summary screen, so the crash
+            // snapshot has nothing left to protect.
+            ACTION_STOP -> { activeRunStore.clear(); stopEverything(); stopSelf() }
         }
         return START_STICKY
     }
@@ -113,20 +145,73 @@ class RunTrackingService : Service() {
             .build()
         val cb = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                result.locations.forEach { loc ->
-                    RunTracker.add(
-                        GpsPointDto(
-                            lat = loc.latitude,
-                            lng = loc.longitude,
-                            ele = if (loc.hasAltitude()) loc.altitude else null,
-                            t = System.currentTimeMillis(),
-                        ),
-                    )
-                }
+                result.locations.forEach { loc -> onFix(loc) }
             }
         }
         callback = cb
         runCatching { fused.requestLocationUpdates(req, cb, mainLooper) }
+    }
+
+    /**
+     * One fix, gated then smoothed. `loc.time` is the fix's own timestamp rather than wall clock,
+     * so a batched delivery doesn't compress several fixes into the same instant — the server
+     * derives duration and pace from these timestamps.
+     */
+    private fun onFix(loc: android.location.Location) {
+        val t = if (loc.time > 0) loc.time else System.currentTimeMillis()
+        val accuracy = if (loc.hasAccuracy()) loc.accuracy else Float.MAX_VALUE
+        if (!filter.offer(loc.latitude, loc.longitude, accuracy, t, loc.speed, loc.hasSpeed())) {
+            // Still worth telling the UI we have a signal — the fix was real, just not usable.
+            RunTracker.noteFix()
+            return
+        }
+        // A rebase means the previous anchor is unrelated to this one (first fix, or back from a
+        // blackout). Smoothing across that boundary would drag the track toward a stale position.
+        val rebased = filter.rebasedOnLastAccept
+        if (rebased) smoother.reset()
+        val (lat, lng) = smoother.process(
+            loc.latitude, loc.longitude, accuracy, t,
+            if (loc.hasSpeed()) loc.speed.toDouble() else 0.0,
+        )
+        val previous = RunTracker.points.value.lastOrNull()
+        val point = GpsPointDto(
+            lat = lat,
+            lng = lng,
+            ele = if (loc.hasAltitude()) loc.altitude else null,
+            t = t,
+            // Only mid-run rebases are gaps; the very first fix has no leg behind it.
+            gap = rebased && previous != null,
+        )
+        if (previous != null && !point.gap) motion.onMove(RunMath.haversine(previous, point), t)
+        RunTracker.add(point)
+
+        // Being carried at 29 km/h for ten seconds is not running. Freeze here rather than
+        // letting the server reject the whole run at the summary screen — half an hour later.
+        if (motion.evaluate(t) == MotionGuard.State.VEHICLE && RunTracker.status.value == RunStatus.RUNNING) {
+            RunTracker.setStatus(RunStatus.PAUSED)
+            RunTracker.noteVehiclePause()
+            stopLocationUpdates()
+            releaseWakeLock()
+        }
+    }
+
+    /**
+     * A foreground service survives, but the CPU can still be suspended between callbacks in
+     * doze. The wake lock is what makes an hour of screen-off running actually record.
+     * Timed out generously so a crashed service can never hold it forever.
+     */
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        wakeLock = runCatching {
+            getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "hitrace:run")
+                .apply { setReferenceCounted(false); acquire(MAX_RUN_MS) }
+        }.getOrNull()
+    }
+
+    private fun releaseWakeLock() {
+        runCatching { wakeLock?.takeIf { it.isHeld }?.release() }
+        wakeLock = null
     }
 
     private fun stopLocationUpdates() {
@@ -162,6 +247,8 @@ class RunTrackingService : Service() {
 
     private fun stopEverything() {
         stopLocationUpdates()
+        releaseWakeLock()
+        StepCounter.stop()
         simJob?.cancel(); simJob = null
         notifyJob?.cancel(); notifyJob = null
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -203,8 +290,17 @@ class RunTrackingService : Service() {
     private fun startNotifyLoop() {
         notifyJob?.cancel()
         notifyJob = scope.launch {
+            var sinceSnapshot = 0L
             while (RunTracker.status.value != RunStatus.FINISHED) {
                 getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification())
+                // Snapshot every ~15s. Frequent enough that a kill costs almost nothing, rare
+                // enough that it isn't a write every notification tick for an hour.
+                RunTracker.setCadenceNow(StepCounter.currentCadence())
+                sinceSnapshot += 2000
+                if (sinceSnapshot >= SNAPSHOT_EVERY_MS && !RunTracker.simulated.value) {
+                    sinceSnapshot = 0
+                    activeRunStore.save(RunTracker.points.value, RunTracker.startMs, System.currentTimeMillis())
+                }
                 delay(2000)
             }
             getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification())
