@@ -81,7 +81,7 @@ private fun CodexCard(e: CodexEntry, onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        BladeCanvas(e.shape, e.bestRarity, glow = e.bestRarity == "LEGEND", modifier = Modifier.size(40.dp, 96.dp))
+        BladeCanvas(e.shape, e.bestRarity, modifier = Modifier.size(40.dp, 96.dp))
         Text(e.name, color = Rb.Text, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

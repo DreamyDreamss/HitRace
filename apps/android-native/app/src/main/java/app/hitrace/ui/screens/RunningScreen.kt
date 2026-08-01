@@ -91,7 +91,45 @@ fun RunningScreen(onBack: () -> Unit, onFinish: () -> Unit, onManual: () -> Unit
 
     fun finish() { RunSession.track = run.finish(); onFinish() }
 
-    Column(Modifier.fillMaxSize().background(Rb.Bg).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    // Controls in the footer: this screen carries a map, live metrics and up to three notices,
+    // and the run can't be started or finished if any of that pushes the buttons off the edge.
+    FooterPage(
+        footer = {
+            when (status) {
+                RunStatus.IDLE -> {
+                    RbButton("러닝 시작", Modifier.fillMaxWidth()) {
+                        permLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    }
+                    OutlinedBtn("데모 러닝 (시뮬레이션)") { run.simulate() }
+                    LinkText(
+                        "GPS 없이 달렸나요? 실내 러닝 →",
+                        onClick = onManual,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontSize = 13.sp,
+                    )
+                }
+                RunStatus.RUNNING -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedBtn("일시정지", Modifier.weight(1f)) { run.pause() }
+                    Button(onClick = { finish() }, enabled = m.distanceKm > 0.05, modifier = Modifier.weight(1.6f).height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) { Text("주조하기", fontWeight = FontWeight.Bold) }
+                }
+                RunStatus.PAUSED -> {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedBtn("재개", Modifier.weight(1f)) { run.resume() }
+                        Button(onClick = { finish() }, modifier = Modifier.weight(1.6f).height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) { Text("주조하기", fontWeight = FontWeight.Bold) }
+                    }
+                    // A run now outlives this screen, so it needs an explicit way to throw one away.
+                    LinkText(
+                        "이 러닝 버리기",
+                        onClick = { run.cancel(); onBack() },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Rb.Muted,
+                        fontSize = 13.sp,
+                    )
+                }
+                RunStatus.FINISHED -> RbButton("요약 보기", Modifier.fillMaxWidth()) { finish() }
+            }
+        },
+    ) { viewportHeight ->
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             LinkText("‹ 홈", onClick = onBack, color = Rb.Muted)
             Spacer(Modifier.weight(1f))
@@ -170,7 +208,10 @@ fun RunningScreen(onBack: () -> Unit, onFinish: () -> Unit, onManual: () -> Unit
             }
         }
 
-        Box(Modifier.fillMaxWidth().height(230.dp).clip(RoundedCornerShape(16.dp)).border(1.dp, Rb.Line, RoundedCornerShape(16.dp))) {
+        // The map is why this screen exists — it shrinks with the viewport rather than being the
+        // thing that forces everything else out of sight.
+        val traceHeight = (viewportHeight * 0.30f).coerceIn(150.dp, 230.dp)
+        Box(Modifier.fillMaxWidth().height(traceHeight).clip(RoundedCornerShape(16.dp)).border(1.dp, Rb.Line, RoundedCornerShape(16.dp))) {
             RouteTrace(points, Modifier.fillMaxSize())
             if (points.size < 2) {
                 Text(if (idle) "시작하면 경로가 그려집니다" else "위치 수신 중…", color = Rb.Muted, fontSize = 13.sp, modifier = Modifier.align(Alignment.Center))
@@ -187,39 +228,6 @@ fun RunningScreen(onBack: () -> Unit, onFinish: () -> Unit, onManual: () -> Unit
             }
         }
 
-        Spacer(Modifier.weight(1f))
-        when (status) {
-            RunStatus.IDLE -> {
-                Button(onClick = { permLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION) }, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) { Text("러닝 시작", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
-                Spacer(Modifier.height(10.dp))
-                OutlinedBtn("데모 러닝 (시뮬레이션)") { run.simulate() }
-                LinkText(
-                    "GPS 없이 달렸나요? 실내 러닝 →",
-                    onClick = onManual,
-                    modifier = Modifier.padding(top = 6.dp).fillMaxWidth(),
-                    fontSize = 13.sp,
-                )
-            }
-            RunStatus.RUNNING -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedBtn("일시정지", Modifier.weight(1f)) { run.pause() }
-                Button(onClick = { finish() }, enabled = m.distanceKm > 0.05, modifier = Modifier.weight(1.6f).height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) { Text("주조하기", fontWeight = FontWeight.Bold) }
-            }
-            RunStatus.PAUSED -> Column {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedBtn("재개", Modifier.weight(1f)) { run.resume() }
-                    Button(onClick = { finish() }, modifier = Modifier.weight(1.6f).height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) { Text("주조하기", fontWeight = FontWeight.Bold) }
-                }
-                // A run now outlives this screen, so it needs an explicit way to throw one away.
-                LinkText(
-                    "이 러닝 버리기",
-                    onClick = { run.cancel(); onBack() },
-                    modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
-                    color = Rb.Muted,
-                    fontSize = 13.sp,
-                )
-            }
-            RunStatus.FINISHED -> Button(onClick = { finish() }, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) { Text("요약 보기", fontWeight = FontWeight.Bold) }
-        }
     }
 }
 

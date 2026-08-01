@@ -84,7 +84,7 @@ fun WorkshopScreen(swordId: String, onBack: () -> Unit, onParts: (String) -> Uni
                 .background(Rb.Deep).border(1.dp, Rb.Line, RoundedCornerShape(18.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            BladeCanvas(s.shape.copy(transform = t), s.rarity, glow = true, modifier = Modifier.size(150.dp, 300.dp))
+            BladeCanvas(s.shape.copy(transform = t), s.rarity, modifier = Modifier.size(150.dp, 300.dp))
             Column(
                 Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(8.dp))
                     .background(Rb.Screen.copy(alpha = 0.8f)).border(1.dp, Rb.Line, RoundedCornerShape(8.dp))

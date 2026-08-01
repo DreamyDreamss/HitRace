@@ -100,7 +100,7 @@ fun FusionScreen(vm: AppViewModel, me: MeResp, onBack: () -> Unit, onFused: (Str
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    BladeCanvas(s.shape, s.rarity, glow = idx >= 0, modifier = Modifier.size(40.dp, 100.dp))
+                    BladeCanvas(s.shape, s.rarity, modifier = Modifier.size(40.dp, 100.dp))
                     Text(s.name, color = if (isEquipped) Rb.Muted else Rb.Text, fontSize = 11.sp, maxLines = 1)
                     Text(
                         if (isEquipped) "장착 중" else "CP ${s.cp}",

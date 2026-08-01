@@ -84,7 +84,7 @@ fun SwordDetailScreen(
             }
 
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                BladeCanvas(s.shape, s.rarity, glow = true, modifier = Modifier.size(92.dp, 220.dp))
+                BladeCanvas(s.shape, s.rarity, modifier = Modifier.size(92.dp, 220.dp))
                 Spacer(Modifier.size(16.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

@@ -18,7 +18,7 @@ import app.hitrace.ui.theme.Rb
 // The workshop transform (rotate/flip/scale) is a graphics-layer effect; the part split
 // changes where the blade ends and the guard/handle begin. Both are cosmetic.
 @Composable
-fun BladeCanvas(shape: Shape, rarity: String, modifier: Modifier = Modifier, glow: Boolean = false) {
+fun BladeCanvas(shape: Shape, rarity: String, modifier: Modifier = Modifier) {
     val c = Rb.rarityColor(rarity)
     val t = shape.transform
     val layer = if (t == null) modifier else modifier.graphicsLayer {
@@ -88,9 +88,9 @@ fun BladeCanvas(shape: Shape, rarity: String, modifier: Modifier = Modifier, glo
         val tip = spine?.lastOrNull() ?: Offset(cx, bladeTop)
         val heel = spine?.firstOrNull() ?: Offset(cx, bladeBottom)
 
-        if (glow) {
-            drawPath(blade, color = c.copy(alpha = 0.28f), style = Stroke(width = 14f))
-        }
+        // No halo behind the blade. It was a 14px stroke of the rarity colour, which on the
+        // common rarities is a muted grey — and now that the silhouette follows the real route,
+        // it traced every bend and read as a smudge around the shape instead of an effect.
         drawPath(
             blade,
             brush = Brush.verticalGradient(

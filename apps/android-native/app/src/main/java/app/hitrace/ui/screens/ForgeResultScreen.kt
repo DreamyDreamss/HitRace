@@ -1,23 +1,21 @@
 package app.hitrace.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,36 +31,80 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hitrace.data.RunSession
-import app.hitrace.data.Sword
 import app.hitrace.ui.BladeCanvas
 import app.hitrace.ui.theme.Rb
 
+/**
+ * The reward reveal: the run, as a sword.
+ *
+ * Laid out with [FooterPage] because this screen keeps growing — record badges, then the weekly
+ * goal banner, then two-line stat rows — and it eventually grew taller than the phone, which put
+ * its only button below the edge with no scroll and no bottom nav to escape by. The actions now
+ * live in a footer that is measured before the body, so no future addition can hide them.
+ */
 @Composable
-fun ForgeResultScreen(onDone: () -> Unit) {
+fun ForgeResultScreen(onDone: () -> Unit, onOpenSword: (String) -> Unit) {
     val sword = RunSession.forged
-    if (sword == null) { onDone(); return }
+    if (sword == null) {
+        // Navigating from composition is a side effect; it belongs in an effect.
+        LaunchedEffect(Unit) { onDone() }
+        return
+    }
     val c = Rb.rarityColor(sword.rarity)
     val reveal = remember { Animatable(0f) }
     LaunchedEffect(Unit) { reveal.animateTo(1f, tween(750)) }
 
-    Column(Modifier.fillMaxSize().background(Rb.Bg).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Spacer(Modifier.height(8.dp))
-        Text("FORGED · ${sword.rarity}", color = c, fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 3.sp)
+    // Whichever way the player leaves — either button or the system back key — the finished run
+    // is done with, so it is cleared in exactly one place.
+    fun finish() {
+        RunSession.clear()
+        onDone()
+    }
+    BackHandler { finish() }
+
+    FooterPage(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        footer = {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RbGhostButton("내 검 보기", Modifier.weight(1f)) {
+                    val id = sword.id
+                    RunSession.clear()
+                    onOpenSword(id)
+                }
+                RbButton("완료", Modifier.weight(1.2f)) { finish() }
+            }
+        },
+    ) { viewportHeight ->
+        Text(
+            "FORGED · ${sword.rarity}",
+            color = c, fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 3.sp,
+        )
         Text("달린 경로가 검이 되었습니다", color = Rb.Text3, fontSize = 13.sp)
         // Records earned by the run that made this blade — the running half of the reward.
         RecordBadges(RunSession.records)
         GoalBanner(RunSession.weeklyGoal)
-        Spacer(Modifier.weight(1f))
-        BladeCanvas(sword.shape, sword.rarity, glow = true, modifier = Modifier.size(150.dp, 320.dp).scale(0.6f + 0.4f * reveal.value).alpha(reveal.value))
+
+        // Sized from the space the body actually got, so the blade is never the reason something
+        // else is pushed off. Aspect ratio held at the original 150:320.
+        val bladeHeight = (viewportHeight * 0.40f).coerceIn(180.dp, 320.dp)
+        BladeCanvas(
+            sword.shape, sword.rarity,
+            // Size first, then the reveal's scale/alpha — swapping the order would change what
+            // the animation's graphics layer wraps.
+            modifier = Modifier
+                .height(bladeHeight)
+                .width(bladeHeight * (150f / 320f))
+                .scale(0.6f + 0.4f * reveal.value)
+                .alpha(reveal.value),
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (sword.shape.trueDoubleEdge) { Text("眞 양날", color = Rb.Gold2, fontFamily = FontFamily.Monospace, fontSize = 11.sp); Spacer(Modifier.size(8.dp)) }
+            if (sword.shape.trueDoubleEdge) {
+                Text("眞 양날", color = Rb.Gold2, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                Spacer(Modifier.size(8.dp))
+            }
             Text("CP ${sword.cp}", color = c, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
         }
-        Spacer(Modifier.weight(1f))
-        StatBars(sword)
-        Button(onClick = { RunSession.track = null; RunSession.forged = null; onDone() }, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Rb.Gold, contentColor = Rb.Screen)) {
-            Text("완료", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        }
+        StatBarsCard(sword.stats)
     }
 }
 
@@ -83,7 +125,13 @@ private fun GoalBanner(g: app.hitrace.data.WeeklyGoalResult) {
     }
 }
 
-/** 🏆 badges for whatever personal bests this run beat. Silent when there are none. */
+/**
+ * 🏆 badges for whatever personal bests this run beat. Silent when there are none.
+ *
+ * FlowRow, not Row: a run that beats all five records would otherwise run off the side of a
+ * narrow screen — the same overflow as the one this screen was fixed for, turned sideways.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RecordBadges(r: app.hitrace.data.RunRecords) {
     if (!r.any) return
@@ -94,7 +142,11 @@ private fun RecordBadges(r: app.hitrace.data.RunRecords) {
         if (r.longestDuration) add("최장 시간")
         if (r.biggestClimb) add("최대 고도")
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         labels.forEach { label ->
             Text(
                 "🏆 $label",
@@ -103,34 +155,6 @@ private fun RecordBadges(r: app.hitrace.data.RunRecords) {
                     .background(Rb.Gold.copy(alpha = 0.13f))
                     .padding(horizontal = 10.dp, vertical = 5.dp),
             )
-        }
-    }
-}
-
-@Composable
-private fun StatBars(s: Sword) {
-    // The moment the sword appears is when someone actually reads these, so each one says what
-    // in the run produced it.
-    val meta = listOf(
-        Triple("예리함", "페이스", s.stats.sharpness),
-        Triple("중량", "고도 상승", s.stats.weight),
-        Triple("내구", "케이던스 일정함", s.stats.durability),
-        Triple("마력", "후반 구간력", s.stats.magic),
-    )
-    val colors = listOf(Rb.Gold, Rb.Blue, Rb.Text2, Rb.Purple)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Rb.Surface2).border(1.dp, Rb.Line, RoundedCornerShape(14.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        meta.forEachIndexed { i, (k, source, v) ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.width(58.dp)) {
-                    Text(k, color = Rb.Text3, fontSize = 12.sp)
-                    Text(source, color = Rb.Muted, fontSize = 9.sp)
-                }
-                Box(Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)).background(Rb.Surface4)) {
-                    Box(Modifier.fillMaxWidth(minOf(1f, v / 900f)).height(6.dp).clip(RoundedCornerShape(3.dp)).background(colors[i]))
-                }
-                Spacer(Modifier.size(10.dp))
-                Text("$v", color = Rb.Text2, fontFamily = FontFamily.Monospace, fontSize = 12.sp, modifier = Modifier.width(40.dp))
-            }
         }
     }
 }

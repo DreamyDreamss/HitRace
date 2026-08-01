@@ -84,7 +84,7 @@ private fun SwordCard(s: Sword, onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        BladeCanvas(s.shape, s.rarity, glow = s.rarity == "LEGEND", modifier = Modifier.size(54.dp, 130.dp))
+        BladeCanvas(s.shape, s.rarity, modifier = Modifier.size(54.dp, 130.dp))
         Text(s.name, color = Rb.Text, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
         androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
             RarityChip(s.rarity, s.plus)

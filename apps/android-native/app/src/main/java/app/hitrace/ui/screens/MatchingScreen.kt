@@ -85,7 +85,7 @@ fun MatchingScreen(vm: AppViewModel, me: MeResp, onBattle: () -> Unit) {
         equipped?.let { s ->
             RbCard {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    BladeCanvas(s.shape, s.rarity, glow = s.rarity == "LEGEND", modifier = Modifier.size(56.dp, 130.dp))
+                    BladeCanvas(s.shape, s.rarity, modifier = Modifier.size(56.dp, 130.dp))
                     Spacer(Modifier.size(16.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(s.name, color = Rb.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)

@@ -46,15 +46,18 @@ fun LoginScreen(vm: AppViewModel) {
     // scale the sign-in button would otherwise sit below the fold, unreachable.
     val heroHeight = (LocalConfiguration.current.screenHeightDp * 0.30f).coerceIn(150f, 300f).dp
     Column(
-        Modifier.fillMaxSize().background(Rb.Bg).verticalScroll(rememberScrollState())
-            .safeDrawingPadding().padding(horizontal = 28.dp, vertical = 20.dp),
+        // safeDrawingPadding BEFORE verticalScroll: applied after, the inset becomes part of the
+        // scrolling content, so at rest the sign-in button sat *underneath* the system
+        // navigation bar and only came out from under it if you happened to scroll.
+        Modifier.fillMaxSize().background(Rb.Bg).safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 28.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         BladeCanvas(
             shape = Shape(style = "double_edge", trueDoubleEdge = true),
             rarity = "LEGEND",
-            glow = true,
             modifier = Modifier.size(heroHeight * 0.47f, heroHeight),
         )
         Text("HIT → RACE", color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 3.sp)

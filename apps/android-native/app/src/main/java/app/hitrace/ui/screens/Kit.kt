@@ -1,13 +1,17 @@
 package app.hitrace.ui.screens
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -18,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,12 +32,59 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hitrace.data.Stats
 import app.hitrace.ui.theme.Rb
 
 /** Shared bits used by the stack screens (detail / upgrade / gacha). */
+
+/**
+ * A page whose actions stay put.
+ *
+ * The body scrolls when it has to; [footer] is a plain, unweighted child of the outer column, so
+ * it is measured *before* the body gets whatever is left. Nothing the body grows into can push
+ * the primary action off the bottom of the screen.
+ *
+ * That failure is why this exists. A `Column(fillMaxSize)` measures unweighted children in
+ * declaration order, so on a screen taller than the viewport the last thing declared — normally
+ * the button — is laid out past the edge, clipped and untappable, with no scroll to recover it.
+ * It happened on the login screen once and on the forge reveal again; this makes it structurally
+ * impossible rather than a thing to remember.
+ *
+ * [content] is handed the height the body actually received. Art that should stay above the fold
+ * sizes itself from that — inside a scroll the incoming max height is infinite, which makes
+ * `weight()` and `fillMaxHeight()` silently useless.
+ */
+@Composable
+fun FooterPage(
+    modifier: Modifier = Modifier,
+    padding: Dp = 20.dp,
+    spacing: Dp = 14.dp,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    scrollState: ScrollState = rememberScrollState(),
+    footer: @Composable ColumnScope.() -> Unit,
+    content: @Composable ColumnScope.(viewportHeight: Dp) -> Unit,
+) {
+    Column(modifier.fillMaxSize().background(Rb.Bg)) {
+        // BoxWithConstraints sits outside the scroll so maxHeight is the real leftover space.
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val available = maxHeight
+            Column(
+                Modifier.fillMaxSize().verticalScroll(scrollState)
+                    .padding(start = padding, end = padding, top = padding),
+                verticalArrangement = Arrangement.spacedBy(spacing),
+                horizontalAlignment = horizontalAlignment,
+            ) { content(available) }
+        }
+        Column(
+            Modifier.fillMaxWidth()
+                .padding(start = padding, end = padding, top = 12.dp, bottom = padding),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) { footer() }
+    }
+}
 
 @Composable
 fun ScreenHeader(back: String, onBack: () -> Unit, right: @Composable () -> Unit = {}) {
@@ -149,7 +202,8 @@ fun StatBarsCard(stats: Stats) {
                 val color = m.color
                 val v = m.pick(stats)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.width(58.dp)) {
+                    // Wide enough for the longest source label ("케이던스 일정함") on one line.
+                    Column(Modifier.width(78.dp)) {
                         Text(label, color = Rb.Text3, fontSize = 12.sp)
                         Text(m.source, color = Rb.Muted, fontSize = 9.sp)
                     }

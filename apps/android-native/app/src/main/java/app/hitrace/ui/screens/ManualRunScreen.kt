@@ -113,7 +113,12 @@ fun ManualRunScreen(vm: AppViewModel, onBack: () -> Unit, onForged: () -> Unit) 
             scope.launch {
                 runCatching { ApiClient.api.manualRun(ManualRunBody(km.toDouble(), paceSec.roundToInt())) }
                     .onSuccess { res ->
+                        // All three, not just the sword: the reveal screen reads records and the
+                        // weekly goal too, and leaving them stale showed the *previous* run's
+                        // 🏆 badges on a treadmill blade.
                         RunSession.forged = res.sword
+                        RunSession.records = res.records
+                        RunSession.weeklyGoal = res.weeklyGoal
                         vm.refresh()
                         onForged()
                     }

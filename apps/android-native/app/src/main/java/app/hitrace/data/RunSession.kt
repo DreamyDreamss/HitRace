@@ -8,6 +8,17 @@ object RunSession {
     var records: RunRecords = RunRecords()
     /** Weekly-goal payout from the just-finished run, if it crossed the line. */
     var weeklyGoal: WeeklyGoalResult = WeeklyGoalResult()
+
+    /**
+     * Everything about the finished run, dropped at once. Clearing only some of it is how a
+     * later forge ends up wearing an earlier run's 🏆 badges.
+     */
+    fun clear() {
+        track = null
+        forged = null
+        records = RunRecords()
+        weeklyGoal = WeeklyGoalResult()
+    }
 }
 
 // Keeps the in-progress workshop transform alive across Workshop → 부위 지정 → Workshop

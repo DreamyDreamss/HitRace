@@ -185,12 +185,29 @@ fun MainScaffold(vm: AppViewModel, me: MeResp) {
                     )
                 }
                 composable(Routes.MANUAL) {
-                    ManualRunScreen(vm, onBack = { nav.popBackStack() }, onForged = { nav.navigate(Routes.FORGE) })
+                    // popUpTo(HOME): once the run is submitted this screen is spent. Leaving it
+                    // on the stack lets back land on a live submit button and re-send the run.
+                    ManualRunScreen(
+                        vm,
+                        onBack = { nav.popBackStack() },
+                        onForged = { nav.navigate(Routes.FORGE) { popUpTo(Routes.HOME) } },
+                    )
                 }
                 composable(Routes.SUMMARY) {
-                    SummaryScreen(vm, onForged = { nav.navigate(Routes.FORGE) }, onSavedOnly = { toHome() })
+                    SummaryScreen(
+                        vm,
+                        onForged = { nav.navigate(Routes.FORGE) { popUpTo(Routes.HOME) } },
+                        onSavedOnly = { toHome() },
+                    )
                 }
-                composable(Routes.FORGE) { ForgeResultScreen(onDone = { toHome() }) }
+                composable(Routes.FORGE) {
+                    ForgeResultScreen(
+                        onDone = { toHome() },
+                        // Straight to the blade that was just earned — the stack becomes
+                        // HOME → SWORD, so back from the detail goes home, not into the reveal.
+                        onOpenSword = { id -> nav.navigate(Routes.sword(id)) { popUpTo(Routes.HOME) } },
+                    )
+                }
                 composable(Routes.GACHA) { GachaScreen(vm, me, onBack = { nav.popBackStack() }) }
                 composable(Routes.SWORD) { entry ->
                     val id = entry.arguments?.getString("id").orEmpty()

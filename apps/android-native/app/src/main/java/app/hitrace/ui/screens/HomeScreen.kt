@@ -220,7 +220,7 @@ fun HomeScreen(
 private fun EquippedCard(s: Sword) {
     Card {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            BladeCanvas(s.shape, s.rarity, glow = s.rarity == "LEGEND", modifier = Modifier.size(72.dp, 168.dp))
+            BladeCanvas(s.shape, s.rarity, modifier = Modifier.size(72.dp, 168.dp))
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

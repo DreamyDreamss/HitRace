@@ -178,7 +178,7 @@ fun RunDetailScreen(runId: String, onBack: () -> Unit, onSword: (String) -> Unit
             Eyebrow("이 러닝이 만든 검")
             RbCard(Modifier.clickable { onSword(s.id) }) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    BladeCanvas(s.shape, s.rarity, glow = s.rarity == "LEGEND", modifier = Modifier.size(44.dp, 104.dp))
+                    BladeCanvas(s.shape, s.rarity, modifier = Modifier.size(44.dp, 104.dp))
                     Spacer(Modifier.size(14.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         RarityChip(s.rarity, s.plus)
