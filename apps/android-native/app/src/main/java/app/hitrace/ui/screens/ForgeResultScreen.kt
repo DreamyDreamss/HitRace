@@ -80,6 +80,8 @@ fun ForgeResultScreen(onDone: () -> Unit, onOpenSword: (String) -> Unit) {
             color = c, fontFamily = FontFamily.Monospace, fontSize = 12.sp, letterSpacing = 3.sp,
         )
         Text("달린 경로가 검이 되었습니다", color = Rb.Text3, fontSize = 13.sp)
+        // 속성 — the weather it was run in. Only when the day was actually something.
+        if (sword.element != "none") ElementChip(sword.element, showWeather = true)
         // Records earned by the run that made this blade — the running half of the reward.
         RecordBadges(RunSession.records)
         GoalBanner(RunSession.weeklyGoal)
@@ -183,6 +185,14 @@ private fun BossDamage(outcome: app.hitrace.data.BossOutcome?) {
                     fontSize = 12.5.sp,
                     modifier = Modifier.weight(1f),
                 )
+                if (hit.matchup == "strong" || hit.matchup == "weak") {
+                    Text(
+                        if (hit.matchup == "strong") "상성 우위" else "상성 열위",
+                        color = if (hit.matchup == "strong") Rb.Green else Rb.Muted,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(end = 6.dp),
+                    )
+                }
                 Text(
                     "%,d".format(hit.damage),
                     color = Rb.Red, fontFamily = FontFamily.Monospace, fontSize = 12.5.sp,

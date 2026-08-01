@@ -5,6 +5,8 @@ import {
   BALANCE,
   applyUpgrade,
   awakenBonus,
+  elementAdvantage,
+  elementFromWeather,
   computeCP,
   computeForgeScore,
   dismantleYield,
@@ -41,6 +43,7 @@ import {
 } from '@hitrace/game-core';
 import { randomUUID } from 'node:crypto';
 import type { LedgerEntry, MatchRecord, Repo, RunRecord } from './db/repo.js';
+import { fetchWeather } from './weather.js';
 import { BossService } from './boss-service.js';
 import type { BossOutcome } from './boss-service.js';
 
@@ -199,6 +202,15 @@ export class GameService {
     if (!tooShortToForge) await this.bumpStreak(userId, now);
 
     if (opts.forge) {
+      // 속성: the weather this run happened in. Never allowed to fail the forge — a dead weather
+      // service costs an attribute, not somebody's hour of running.
+      const start = clean.points[0];
+      const weather = start
+        ? await fetchWeather(start.lat, start.lng, start.t).catch(() => undefined)
+        : undefined;
+      sword.element = elementFromWeather(weather);
+      sword.weather = weather;
+
       await this.repo.addSword(sword);
       // Your first blade equips itself. There is nothing to choose between when you own one, and
       // leaving it unequipped silently locks a new runner out of PvP and halves the damage they
@@ -260,6 +272,7 @@ export class GameService {
       paceSecPerKm: metrics.avgPaceSecPerKm,
       elevationGainM: metrics.elevationGainM,
       equippedCp: equipped?.cp,
+      equippedElement: equipped?.element,
       streakDays: user?.streakDays,
       at: now,
     });
@@ -491,8 +504,8 @@ export class GameService {
 
     const matchId = id('match');
     const seed = matchId;
-    const a: Combatant = { id: my.id, name: my.name, stats: effectiveStats(my.stats, my.engravings), cadence: 172, engravings: my.engravings };
-    const b: Combatant = { id: ghost.id, name: ghost.sword.name, stats: effectiveStats(ghost.sword.stats, ghost.sword.engravings), cadence: ghost.sword.cadence, engravings: ghost.sword.engravings };
+    const a: Combatant = { id: my.id, name: my.name, stats: effectiveStats(my.stats, my.engravings), cadence: 172, engravings: my.engravings, element: my.element };
+    const b: Combatant = { id: ghost.id, name: ghost.sword.name, stats: effectiveStats(ghost.sword.stats, ghost.sword.engravings), cadence: ghost.sword.cadence, engravings: ghost.sword.engravings, element: (ghost.sword as any).element };
     const combat = simulateCombat(a, b, seed);
     const won = combat.winner === 'a';
     const delta = rpDelta(won, seed);

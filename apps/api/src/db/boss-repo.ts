@@ -21,6 +21,8 @@ export interface BossRow {
   tier: number;
   name: string;
   seed: string;
+  /** 속성 — seeded per region+cycle so the counter is a fresh question each week. */
+  element: import('@hitrace/game-core').Element;
   maxHp: number;
   hp: number;
   participants: number;

@@ -2,6 +2,7 @@
 // replayed identically on client (for the spectator animation) and server (for
 // the authoritative result). Produces a full event log for the UI to stage.
 
+import { elementAdvantage } from './element.js';
 import { BALANCE } from './config/balance.js';
 import { Rng } from './rng.js';
 import type { Combatant, CombatEventLog, CombatResult } from './types.js';
@@ -63,6 +64,13 @@ function takeTurn(
     dmg = Math.round(dmg * cfg.skillDamageMultiplier);
     kind = 'skill';
     label = swordName(attacker) + ' · 필살기';
+  }
+
+  // 속성 상성 — the weather each blade was forged in, meeting the other's.
+  const counter = elementAdvantage(attacker.ref.element ?? 'none', defender.ref.element ?? 'none');
+  if (counter !== 1) {
+    dmg = Math.round(dmg * counter);
+    if (counter > 1) label += ' · 상성';
   }
 
   // Engraving triggers (simple additive/percentage hooks).

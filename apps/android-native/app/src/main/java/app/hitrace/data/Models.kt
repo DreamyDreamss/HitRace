@@ -64,6 +64,8 @@ data class Sword(
     val courseHash: String = "",
     /** 각성 단계 0..5 — boss drops pay for growth past the upgrade ceiling. */
     val awakening: Int = 0,
+    /** 속성 — the weather this run happened in: fire·water·wind·ice·none. */
+    val element: String = "none",
 )
 
 @Serializable
@@ -156,6 +158,7 @@ data class BossInfo(
     val hp: Long = 0,
     val maxHp: Long = 1,
     val seed: String = "",
+    val element: String = "none",
     val participants: Int = 0,
     val cycleKey: String = "",
 ) {
@@ -187,6 +190,8 @@ data class BossHit(
     val boss: BossInfo = BossInfo(),
     val killed: Boolean = false,
     val manaStone: Int = 0,
+    /** strong | weak | even — why the damage number looks like it does. */
+    val matchup: String = "even",
 )
 
 @Serializable

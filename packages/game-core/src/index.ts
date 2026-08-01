@@ -17,6 +17,20 @@ export {
   fingerprint,
 } from './conversion.js';
 export { computeSplits, bestKmPace } from './splits.js';
+// ── 속성 (날씨) ───────────────────────────────────────────────────────────────
+export {
+  ELEMENTS,
+  ELEMENT_LABEL,
+  ELEMENT_WEATHER,
+  ELEMENT_ADVANTAGE,
+  ELEMENT_DISADVANTAGE,
+  elementAdvantage,
+  elementMatchup,
+  elementFromWeather,
+  bossElement,
+} from './element.js';
+export type { Element, WeatherSample } from './element.js';
+
 // ── 동네 보스 ─────────────────────────────────────────────────────────────────
 export { bossMaxHp, joinBoss, nextCycleStartTier } from './boss/hp.js';
 export {

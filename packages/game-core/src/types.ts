@@ -2,6 +2,8 @@
 // Domain types for the HitRace game engine. Pure data — no I/O, no framework.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { Element, WeatherSample } from './element.js';
+
 /** A single GPS sample recorded during a run. */
 export interface GpsPoint {
   /** Latitude in decimal degrees. */
@@ -145,6 +147,10 @@ export interface Sword {
   engravings: Array<Engraving | null>;
   /** 각성 단계 0..5. Growth past the upgrade ceiling, paid for with boss drops. */
   awakening?: number;
+  /** 속성 — the weather this run happened in. 'none' when there was no reading, or a mild day. */
+  element?: Element;
+  /** The reading the element came from, so the app can explain it. */
+  weather?: WeatherSample;
   /** Source run id and course fingerprint. */
   runId: string;
   courseHash: string;
@@ -173,6 +179,8 @@ export interface Combatant {
   stats: Stats;
   cadence: number;
   engravings: Array<Engraving | null>;
+  /** 속성 — absent means 無, which neither wins nor loses a matchup. */
+  element?: Element;
 }
 
 export interface CombatEventLog {

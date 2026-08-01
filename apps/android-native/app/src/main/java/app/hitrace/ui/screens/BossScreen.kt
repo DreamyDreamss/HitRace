@@ -93,6 +93,17 @@ private fun BossBody(status: BossStatus, viewportHeight: androidx.compose.ui.uni
         Text(boss.name, color = Rb.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         Text("${boss.tier}단계", color = Rb.Gold, fontFamily = FontFamily.Monospace, fontSize = 14.sp)
     }
+    // The tactical line — the whole reason to look at this screen before deciding when to run.
+    if (boss.element != "none") {
+        val counter = counterOf(boss.element)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            ElementChip(boss.element)
+            Text(
+                "  ${elementLabel(counter)} 속성 검이 유리 — ${elementWeather(counter)}에 뛰세요",
+                color = Rb.Text3, fontSize = 11.5.sp,
+            )
+        }
+    }
 
     Box(Modifier.fillMaxWidth().height((viewportHeight * 0.30f).coerceIn(160.dp, 260.dp)), contentAlignment = Alignment.Center) {
         BossCanvas(boss.seed, boss.tier, Modifier.fillMaxSize())
@@ -156,4 +167,13 @@ private fun BossBody(status: BossStatus, viewportHeight: androidx.compose.ui.uni
         }
     }
     Spacer(Modifier.height(4.dp))
+}
+
+/** Which element beats [element] — the answer the boss screen exists to give. */
+private fun counterOf(element: String): String = when (element) {
+    "ice" -> "fire"
+    "wind" -> "ice"
+    "water" -> "wind"
+    "fire" -> "water"
+    else -> "none"
 }

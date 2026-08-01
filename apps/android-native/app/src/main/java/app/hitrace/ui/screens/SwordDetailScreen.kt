@@ -96,6 +96,7 @@ fun SwordDetailScreen(
                         }
                     }
                     Text(s.name, color = Rb.Text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    ElementChip(s.element, showWeather = true)
                     Text("CP ${s.cp}", color = c, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
                     Text(s.shape.style, color = Rb.Muted, fontFamily = FontFamily.Monospace, fontSize = 10.5.sp)
                 }

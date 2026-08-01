@@ -27,6 +27,8 @@ function rowToSword(r: any): Sword {
     stats: { sharpness: r.sharpness, weight: r.weight, durability: r.durability, magic: r.magic },
     shape: r.shape, plus: r.plus, cp: r.cp, engravings: [], runId: r.run_id ?? 'seed',
     awakening: r.awakening ?? 0,
+    element: r.element ?? 'none',
+    weather: r.weather ?? undefined,
     courseHash: r.course_hash, createdAt: new Date(r.created_at).getTime(),
   };
 }
@@ -220,9 +222,10 @@ export class PgRepo implements Repo {
   async addSword(s: Sword) {
     await this.q(
       `INSERT INTO swords (id,owner_id,run_id,name,rarity,style,true_double_edge,
-        base_sharpness,base_weight,base_durability,base_magic,sharpness,weight,durability,magic,plus,cp,shape,course_hash)
-       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$7,$8,$9,$10,$11,$12,$13,$14)`,
-      [s.id, s.ownerId, s.name, s.rarity, s.shape.style, s.shape.trueDoubleEdge, s.stats.sharpness, s.stats.weight, s.stats.durability, s.stats.magic, s.plus, s.cp, JSON.stringify(s.shape), s.courseHash],
+        base_sharpness,base_weight,base_durability,base_magic,sharpness,weight,durability,magic,plus,cp,shape,course_hash,element,weather)
+       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb)`,
+      [s.id, s.ownerId, s.name, s.rarity, s.shape.style, s.shape.trueDoubleEdge, s.stats.sharpness, s.stats.weight, s.stats.durability, s.stats.magic, s.plus, s.cp, JSON.stringify(s.shape), s.courseHash,
+        s.element ?? 'none', s.weather ? JSON.stringify(s.weather) : null],
     );
     // materialise empty engraving slots
     for (let slot = 0; slot < s.engravings.length; slot++) {

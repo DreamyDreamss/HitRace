@@ -25,6 +25,7 @@ const toBoss = (r: any): BossRow => ({
   tier: r.tier,
   name: r.name,
   seed: r.seed,
+  element: r.element ?? 'none',
   maxHp: Number(r.max_hp),
   hp: Number(r.hp),
   participants: r.participants,
@@ -81,11 +82,11 @@ export class PgBossRepo implements BossRepo {
     // ON CONFLICT: two runners can submit the first run of a cycle at the same moment. One
     // inserts, the other reads back the same boss rather than failing or forking the fight.
     const r = await this.q(
-      `INSERT INTO bosses (region_code, level, cycle_key, tier, name, seed, max_hp, hp, participants)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `INSERT INTO bosses (region_code, level, cycle_key, tier, name, seed, element, max_hp, hp, participants)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        ON CONFLICT (region_code, cycle_key, tier) DO UPDATE SET name = bosses.name
        RETURNING *`,
-      [row.regionCode, row.level, row.cycleKey, row.tier, row.name, row.seed, row.maxHp, row.hp, row.participants],
+      [row.regionCode, row.level, row.cycleKey, row.tier, row.name, row.seed, row.element, row.maxHp, row.hp, row.participants],
     );
     return toBoss(r.rows[0]);
   }

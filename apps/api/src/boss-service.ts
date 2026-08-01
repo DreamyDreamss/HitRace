@@ -1,6 +1,9 @@
 import {
   BALANCE,
   allocateRegions,
+  bossElement,
+  elementAdvantage,
+  elementMatchup,
   awakenCost,
   bossMaxHp,
   bossName,
@@ -11,6 +14,7 @@ import {
   monthKey,
   weekKey,
 } from '@hitrace/game-core';
+import type { Element } from '@hitrace/game-core';
 import type { BossRepo, BossRow, RegionRow } from './db/boss-repo.js';
 
 export interface RunFacts {
@@ -19,6 +23,7 @@ export interface RunFacts {
   paceSecPerKm: number;
   elevationGainM: number;
   equippedCp?: number;
+  equippedElement?: Element;
   streakDays?: number;
   at: number;
 }
@@ -27,9 +32,11 @@ export interface RegionHit {
   region: RegionRow;
   distanceKm: number;
   damage: number;
-  boss: { id: string; name: string; tier: number; hp: number; maxHp: number };
+  boss: { id: string; name: string; tier: number; hp: number; maxHp: number; element: Element };
   killed: boolean;
   manaStone: number;
+  /** 'strong' | 'weak' | 'even' — so the app can say why the number looks like it does. */
+  matchup: 'strong' | 'weak' | 'even';
 }
 
 export interface BossOutcome {
@@ -78,13 +85,18 @@ export class BossService {
         }
 
         const boss = await this.ensureBoss(region, level, facts.at);
-        const { damage } = computeDamage({
+        const base = computeDamage({
           distanceKm: share.distanceKm,
           paceSecPerKm: facts.paceSecPerKm,
           elevationGainM: facts.elevationGainM,
           equippedCp: facts.equippedCp,
           streakDays: facts.streakDays,
-        });
+        }).damage;
+        // 속성 상성. Weather is not chosen, so this is a nudge worth about a 1.5x power gap —
+        // enough that checking the forecast is a real decision, not enough to make it the game.
+        const element = facts.equippedElement ?? 'none';
+        const matchup = elementMatchup(element, boss.element);
+        const damage = Math.round(base * elementAdvantage(element, boss.element));
         if (damage <= 0) continue;
 
         const joinHp = await this.joinHpIfNew(boss, facts.userId);
@@ -101,9 +113,13 @@ export class BossService {
           region,
           distanceKm: share.distanceKm,
           damage,
-          boss: { id: boss.id, name: boss.name, tier: boss.tier, hp: after.hp, maxHp: after.maxHp },
+          boss: {
+            id: boss.id, name: boss.name, tier: boss.tier,
+            hp: after.hp, maxHp: after.maxHp, element: boss.element,
+          },
           killed: after.killed,
           manaStone: earned,
+          matchup,
         });
       }
     }
@@ -130,6 +146,9 @@ export class BossService {
       tier,
       name: bossName(region.name, tier, seed),
       seed,
+      // Seeded, not taken from local weather: a Korean summer would otherwise hand every boss 炎
+      // for two months and the counter would stop being a choice.
+      element: bossElement(seed),
       maxHp,
       hp: maxHp,
       participants: 0,
@@ -199,6 +218,7 @@ export class BossService {
         hp: boss.hp,
         maxHp: boss.maxHp,
         seed: boss.seed,
+        element: boss.element,
         participants: boss.participants,
         cycleKey: boss.cycleKey,
       },
