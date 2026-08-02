@@ -40,11 +40,19 @@ function hourStamp(atMs: number, tzOffsetMinutes = 9 * 60): string {
   return new Date(atMs + tzOffsetMinutes * 60_000).toISOString().slice(0, 13);
 }
 
+/**
+ * Kill switch. Set `HITRACE_DISABLE_WEATHER=1` to forge plain swords without touching the
+ * network — used by the test suite (which must not depend on a third party being up) and
+ * available in ops if Open-Meteo ever misbehaves.
+ */
+const disabled = () => process.env.HITRACE_DISABLE_WEATHER === '1';
+
 export async function fetchWeather(
   lat: number,
   lng: number,
   atMs: number,
 ): Promise<WeatherSample | undefined> {
+  if (disabled()) return undefined;
   const key = cacheKey(lat, lng, atMs);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;

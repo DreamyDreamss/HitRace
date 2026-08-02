@@ -7,11 +7,33 @@ import { buildServer } from '../server.js';
 // Minimal synthetic run generator (Seoul, ~configurable).
 // Anchored near "now" on purpose: the running stats bucket by when the run *started*,
 // so a track dated 2023 would never land in "this week".
+/**
+ * Two hours ago — but never earlier than this week began.
+ *
+ * The plain "now minus two hours" this used to be put the run in *last* week whenever the suite
+ * ran in the first couple of hours of a Monday, and the weekly-stats tests failed for reasons
+ * that had nothing to do with the code. A test that is red for two hours a week teaches people
+ * to ignore it.
+ */
+let runSequence = 0;
+
+function recentStart(): number {
+  const now = Date.now();
+  const kst = new Date(now + 9 * 3600_000);
+  const daysSinceMonday = (kst.getUTCDay() + 6) % 7;
+  const weekStart =
+    Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate() - daysSinceMonday) - 9 * 3600_000;
+  // Each call must land on its own second. The server keys a run by its first sample's
+  // timestamp (that is what makes retries idempotent), so fixtures sharing a start time would
+  // all come back as duplicates of the first one.
+  return Math.max(now - 2 * 3600_000, weekStart + 3600_000) + runSequence++ * 1000;
+}
+
 function synthRun(
   distanceKm = 5,
   paceSecPerKm = 330,
   shape: 'line' | 'out_and_back' = 'line',
-  startedAt = Date.now() - 2 * 60 * 60 * 1000,
+  startedAt = recentStart(),
 ): RunTrack {
   const base = { lat: 37.5285, lng: 126.9327 };
   const n = Math.max(20, Math.round(distanceKm * 40));
